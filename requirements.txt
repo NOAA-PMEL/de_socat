@@ -8,5 +8,5 @@ datashader
 pyproj
 redis
 kaleido
-packaging>=23
+packaging>=23.1
 git+https://github.com/noaaroland/sdig.git
