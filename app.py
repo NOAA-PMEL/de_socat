@@ -397,6 +397,9 @@ def update_plots(plot_data_store, in_plot_type, in_prop_prop_x, in_prop_prop_y, 
     if in_map_variable is None or len(in_map_variable) == 0:
         print('data-plot: no variable')
         raise exceptions.PreventUpdate
+    if plot_data_store == 'no':
+        print('no new data')
+        raise exceptions.PreventUpdate
     
     to_plot = pd.read_json(redis_instance.hget("cache","plot-data"))
     to_plot.sort_values(['time','expocode'])
@@ -412,9 +415,11 @@ def update_plots(plot_data_store, in_plot_type, in_prop_prop_x, in_prop_prop_y, 
     else:
         cmap = px.colors.qualitative.Dark24
     if in_plot_type == 'timeseries':
-        print('timeseries plot')
-        card_title = 'Time seris of ' + in_map_variable + ' from ' # WRITE TO DATA THINGY AND GET IT HERE + ', '.join(plot_in_expocode)
-        to_plot.sort_values('time')
+        print('timeseries plot with ' + str(to_plot.shape[0]) + ' data points.')
+        card_title = 'Time seris of ' + in_map_variable + ' from ' + ', '.join(plot_in_expocode)
+        print('start sort')
+        to_plot.sort_values('time', inplace=True)
+        print('end sort -- plotting now')
         figure = px.line(to_plot,
                     x='time', 
                     y=in_map_variable, 
@@ -424,6 +429,7 @@ def update_plots(plot_data_store, in_plot_type, in_prop_prop_x, in_prop_prop_y, 
                     color_discrete_sequence=px.colors.qualitative.Light24,
                 )
         figure.update_layout(height=450)
+        print('plot done height set')
         # figure.update_traces(connectgaps=False)
     elif in_plot_type == 'prop-prop':
         card_title = in_prop_prop_y + ' vs ' + in_prop_prop_x + ' colored by ' + in_prop_prop_colorby
@@ -480,7 +486,7 @@ def update_plots(plot_data_store, in_plot_type, in_prop_prop_x, in_prop_prop_y, 
             figure.update_xaxes(title_text=thumbnail_pairs[d][0], showticklabels=True, row=i, col=j)
             figure.update_yaxes(title_text=thumbnail_pairs[d][1], showticklabels=True, row=i, col=j)
         figure.update_layout(height=num_rows*450, margin=dict( l=80, r=80, b=80, t=80, ))
-
+    print('returning figure and title')
     return[figure, card_title]
 
 
