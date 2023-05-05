@@ -9,4 +9,5 @@ pyproj
 redis
 kaleido
 packaging
+dash_mantine_components 
 git+https://github.com/noaaroland/sdig.git
