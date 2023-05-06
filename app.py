@@ -435,8 +435,7 @@ def update_plots(plot_data_store, in_plot_type, in_prop_prop_x, in_prop_prop_y, 
     if in_plot_type == 'timeseries':
         # DEBUG print('timeseries plot with ' + str(to_plot.shape[0]) + ' data points.')
         ts_sub = to_plot[['time', 'latitude', 'longitude', in_map_variable, 'expocode']]
-        ts_sort = ts_sub.sort_values(['time','expocode'])
-        ts_clean = 
+        ts_plot = ts_sub.sort_values(['time','expocode'])
         card_title = 'Time seris of ' + in_map_variable + ' from ' + str(plot_in_expocode)
         # DEBUG print('start sort')
         # DEBUG print('end sort -- plotting now')
