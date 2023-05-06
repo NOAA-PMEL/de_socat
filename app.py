@@ -70,8 +70,8 @@ map_limits = {"west": -180, "east": 180, "south": -89, "north": 89}
 map_height = 525
 map_width = 1050
 
-agg_x = 360
-agg_y = 180
+agg_x = 270
+agg_y = 135
 
 map_title_base = 'Trajectory from the SOCAT v2022 Decimated Data Set '
 decimated_url = 'https://data.pmel.noaa.gov/socat/erddap/tabledap/socat_v2020_decimated'
@@ -132,7 +132,13 @@ app.layout = ddk.App(children=[
             ),
         ),
         dcc.Loading(
-            dcc.Graph(id='map-graph'),
+            dcc.Graph(id='map-graph', config={'modeBarButtonsToAdd':['zoom2d',
+                                        'drawopenpath',
+                                        'drawclosedpath',
+                                        'drawcircle',
+                                        'drawrect',
+                                        'eraseshape'
+                                       ]}),
         )
     ]),    
     ddk.ControlCard(id='plot-controls', width=.3, style={'visibility': 'hidden'}, children=[
@@ -175,7 +181,7 @@ app.layout = ddk.App(children=[
                 id='one-graph-header',
             ),
         ),
-        dcc.Loading(ddk.Graph(id='one-graph'))
+        dcc.Loading(dcc.Graph(id='one-graph'))
     ]),
 ])
 
@@ -248,17 +254,18 @@ def update_map(map_in_expocode, map_in_variable, in_start_date, in_end_date, map
         expocodes = df['expocode'].unique()
         for code in sorted(expocodes):
             expo_options.append({'value': code, 'label': code})
-    print('found ' + str(df.shape[0]) + ' observations')
-    if 'fCO2' in map_in_variable:
-        rmin = 160
-        rmax = 560
-    else:
-        rmin = qdf[map_in_variable].min()
-        rmax = qdf[map_in_variable].max()
+    # DEBUG print('found ' + str(df.shape[0]) + ' observations')
+
     if (df.shape[0]<50000):
         title = map_in_variable + ' from ' + in_start_date + ' to ' + in_end_date
-        print('making a scatter geo plot')
+        # DEBUG print('making a scatter geo plot')
         df = df.loc[df[map_in_variable].notna()]
+        if 'fCO2' in map_in_variable:
+            rmin = 160
+            rmax = 560
+        else:
+            rmin = df[map_in_variable].min()
+            rmax = df[map_in_variable].max()
         figure = px.scatter_geo(df,
                                 lat='latitude',
                                 lon='longitude',
@@ -269,7 +276,7 @@ def update_map(map_in_expocode, map_in_variable, in_start_date, in_end_date, map
         figure.update_traces(marker=dict(size=6))
     else:
         title = 'Mean of ' + map_in_variable + ' from ' + in_start_date + ' to ' + in_end_date
-        print('making a datashader plot')
+        # DEBUG print('making a datashader plot')
         cvs = ds.Canvas(plot_width=agg_x, plot_height=agg_y, x_range=[-180,180], y_range=[-90,90],)
         agg = cvs.points(df, 'longitude', 'latitude', ds.mean(map_in_variable))
         sdf = agg.to_pandas()
@@ -277,6 +284,12 @@ def update_map(map_in_expocode, map_in_variable, in_start_date, in_end_date, map
         qdf = pdf.to_frame().reset_index()
         qdf.columns=['longitude','latitude',map_in_variable]
         qdf = qdf.loc[qdf[map_in_variable].notna()]
+        if 'fCO2' in map_in_variable:
+            rmin = 160
+            rmax = 560
+        else:
+            rmin = qdf[map_in_variable].min()
+            rmax = qdf[map_in_variable].max()
         figure = px.scatter_geo(qdf, lat='latitude', lon='longitude', color=map_in_variable, range_color=[rmin, rmax], color_continuous_scale='Viridis')
         figure.update_geos(showland=True, coastlinecolor='black', coastlinewidth=1, landcolor='tan')
         figure.update_traces(marker={'size':3})
@@ -330,17 +343,16 @@ def selectData(selectData):
 )
 def set_platform_code_from_map(in_click, state_in_expovalue):
     out_expocode = None
-    print('printing click')
-    print(str(in_click))
+    # DEBUG print('printing click')
+    # DEBUG print(str(in_click))
     if in_click is not None:
-        print('getting first point')
+        # DEBUG print('getting first point')
         fst_point = in_click['points'][0]
-        print(fst_point)
+        # DEBUG print(fst_point)
         if 'customdata' in fst_point:
             out_expocode = fst_point['customdata']
             out_value = out_expocode[0]
         else:
-            print('no hover text')
             raise exceptions.PreventUpdate
     if state_in_expovalue is not None and len(state_in_expovalue) > 0:
         if isinstance(state_in_expovalue, str):
@@ -348,7 +360,11 @@ def set_platform_code_from_map(in_click, state_in_expovalue):
         elif isinstance(state_in_expovalue, list):
             state_in_expovalue.append(out_expocode)
             out_value = state_in_expovalue
-    return [out_value]
+    if isinstance(out_value, list):
+        new_lst = [item for item in out_value if item is not None]
+        return [new_lst]
+    else:
+        return [out_value]
 
 
 @app.callback(
@@ -390,8 +406,8 @@ def update_plots(plot_data_store, in_plot_type, in_prop_prop_x, in_prop_prop_y, 
     x_label = None
     y_label = None
     legend_title = None
-
-    if plot_in_expocode is None or len(in_map_variable) == 0:
+    print(str(plot_in_expocode))
+    if plot_in_expocode is None or len(plot_in_expocode) == 0:
         print('data-plot: no expo')
         raise exceptions.PreventUpdate
     if in_map_variable is None or len(in_map_variable) == 0:
@@ -402,7 +418,8 @@ def update_plots(plot_data_store, in_plot_type, in_prop_prop_x, in_prop_prop_y, 
         raise exceptions.PreventUpdate
     
     to_plot = pd.read_json(redis_instance.hget("cache","plot-data"))
-    to_plot.sort_values(['time','expocode'])
+
+    
 
     if to_plot.shape[0] < 1:
         raise exceptions.PreventUpdate
@@ -414,22 +431,25 @@ def update_plots(plot_data_store, in_plot_type, in_prop_prop_x, in_prop_prop_y, 
         cmap = px.colors.qualitative.Light24
     else:
         cmap = px.colors.qualitative.Dark24
+
     if in_plot_type == 'timeseries':
-        print('timeseries plot with ' + str(to_plot.shape[0]) + ' data points.')
-        card_title = 'Time seris of ' + in_map_variable + ' from ' + ', '.join(plot_in_expocode)
-        print('start sort')
-        to_plot.sort_values('time', inplace=True)
-        print('end sort -- plotting now')
-        figure = px.line(to_plot,
+        # DEBUG print('timeseries plot with ' + str(to_plot.shape[0]) + ' data points.')
+        ts_sub = to_plot[['time', 'latitude', 'longitude', in_map_variable, 'expocode']]
+        ts_sort = ts_sub.sort_values(['time','expocode'])
+        ts_clean = 
+        card_title = 'Time seris of ' + in_map_variable + ' from ' + str(plot_in_expocode)
+        # DEBUG print('start sort')
+        # DEBUG print('end sort -- plotting now')
+        figure = px.line(ts_plot,
                     x='time', 
                     y=in_map_variable, 
                     color='expocode', 
                     hover_name='expocode',
-                    hover_data=['time','expocode', in_map_variable],
+                    hover_data=['time','latitude','longitude', in_map_variable],
                     color_discrete_sequence=px.colors.qualitative.Light24,
                 )
         figure.update_layout(height=450)
-        print('plot done height set')
+        #DEBUG print('plot done height set')
         # figure.update_traces(connectgaps=False)
     elif in_plot_type == 'prop-prop':
         card_title = in_prop_prop_y + ' vs ' + in_prop_prop_x + ' colored by ' + in_prop_prop_colorby
@@ -486,7 +506,7 @@ def update_plots(plot_data_store, in_plot_type, in_prop_prop_x, in_prop_prop_y, 
             figure.update_xaxes(title_text=thumbnail_pairs[d][0], showticklabels=True, row=i, col=j)
             figure.update_yaxes(title_text=thumbnail_pairs[d][1], showticklabels=True, row=i, col=j)
         figure.update_layout(height=num_rows*450, margin=dict( l=80, r=80, b=80, t=80, ))
-    print('returning figure and title')
+    # DEBUG print('returning figure and title')
     return[figure, card_title]
 
 
