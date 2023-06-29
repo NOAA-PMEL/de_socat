@@ -573,7 +573,14 @@ def update_map(map_in_variable, in_regions, in_woce_water, in_start_date, in_end
         url = url + cons['lat'] + cons['lon']
     expo_options = []
     print('map URL: ' + url)
-    df = pd.read_csv(url, skiprows=[1])
+    try:
+        df = pd.read_csv(url, skiprows=[1])
+    except:
+        figure = go.Figure(go.Scattergeo())
+        figure.update_layout(margin={'t':25, 'b':25, 'l':0, 'r':0})
+        figure.update_geos(showland=True, coastlinecolor='black', coastlinewidth=1, landcolor='tan', resolution=50)
+        figure.update_layout(title='Query returned no results.')
+        return [figure, 'No matching data found.', []]  
     if map_in_expocode is not None and len(map_in_expocode) > 0:
         expo_store = redis_instance.hget("cache", "expocodes")
         expo_options = json.loads(expo_store)
@@ -1021,6 +1028,9 @@ def set_prop_prop_display(in_plot_type):
         Output('start-date-picker', 'value', allow_duplicate=True),
         Output('end-date-picker', 'value', allow_duplicate=True),
         Output('investigator', 'value', allow_duplicate=True),
+        Output('organization', 'value', allow_duplicate=True),
+        Output('qc-flag', 'value', allow_duplicate=True),
+        Output('platform-type', 'value', allow_duplicate=True),
     ],
     [
         Input('reset', 'n_clicks'),
@@ -1029,7 +1039,7 @@ def set_prop_prop_display(in_plot_type):
     ], prevent_initial_call=True
 )
 def reset_map(click, min_date, max_date):
-    return ['', [], [], min_date, max_date, '']
+    return ['', [], [], min_date, max_date, '', '', [], []]
 
 
 def cc_color_set(index, palette):
