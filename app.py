@@ -198,21 +198,21 @@ app.layout = dmc.Container(fluid=True, children=[
                             dmc.AccordionItem(value='investigator-item', children=[
                                 dmc.AccordionControl("Investigators:"),
                                 dmc.AccordionPanel(children=[
-                                    dmc.MultiSelect(id='investigator', placeholder='Select investigators', searchable=True, data=[
+                                    dmc.MultiSelect(id='investigator', placeholder='Select investigators', clearable=True, searchable=True, data=[
                                     ]),                                
                                 ]),
                             ]),
                             dmc.AccordionItem(value='organization-item', children=[
                                 dmc.AccordionControl("Organization:"),
                                 dmc.AccordionPanel(children=[
-                                    dmc.MultiSelect(id='organization', placeholder='Select organization', searchable=True, data=[
+                                    dmc.MultiSelect(id='organization', placeholder='Select organization', clearable=True, searchable=True, data=[
                                     ]),                                
                                 ])
                             ]),
                             dmc.AccordionItem(value='qc-flag-item', children=[
                                 dmc.AccordionControl("QC Flag:"),
                                 dmc.AccordionPanel(children=[
-                                    dmc.MultiSelect(id='qc-flag', placeholder='Select QC Flag', searchable=True, data=[
+                                    dmc.MultiSelect(id='qc-flag', placeholder='Select QC Flag', clearable=True, searchable=True, data=[
                                         {'label': 'A', 'value': 'A'},
                                         {'label': 'B', 'value': 'B'},
                                         {'label': 'C', 'value': 'C'},
@@ -224,7 +224,7 @@ app.layout = dmc.Container(fluid=True, children=[
                             dmc.AccordionItem(value='platform-type-item', children=[
                                 dmc.AccordionControl("Platform Type:"),
                                 dmc.AccordionPanel(children=[
-                                    dmc.MultiSelect(id='platform-type', placeholder='Select Platform Type', searchable=True, data=[
+                                    dmc.MultiSelect(id='platform-type', placeholder='Select Platform Type', clearable=True, searchable=True, data=[
                                         {'label': "Autonomous Surface Vehicle", 'value': "Autonomous Surface Vehicle"},
                                         {'label': "Boat", 'value': "Boat"},
                                         {'label': "Drifting Buoy", 'value': "Drifting Buoy"},
@@ -292,13 +292,13 @@ app.layout = dmc.Container(fluid=True, children=[
                 dmc.AccordionItem(value='expocode-accordion', children=[
                     dmc.AccordionControl('Expocode:'),
                     dmc.AccordionPanel(children=[
-                        dmc.MultiSelect(id='expocode', placeholder='Select Cruises by Expocode', searchable=True)
+                        dmc.MultiSelect(id='expocode', placeholder='Select Cruises by Expocode', clearable=True, searchable=True)
                     ]),
                 ]),
                 dmc.AccordionItem(value='plot-type-accordion', children=[
                     dmc.AccordionControl('Plot Type:'),
                     dmc.AccordionPanel([
-                        dmc.Select(id='plot-type', value='timeseries',
+                        dmc.Select(id='plot-type', value='timeseries', clearable=False,
                             data=[
                                 {'label': 'Timeseries', 'value': 'timeseries'},
                                 {'label': 'Property-Property', 'value': 'prop-prop'},
@@ -310,19 +310,19 @@ app.layout = dmc.Container(fluid=True, children=[
                 dmc.AccordionItem(id='prop-prop-x-item', style={'visibility':'hidden'}, value='prop-prop-x-accordion', children=[
                     dmc.AccordionControl('Property-property X-axis'),
                     dmc.AccordionPanel(children=[
-                        dmc.Select(id='prop-prop-x', value='time', searchable=True)
+                        dmc.Select(id='prop-prop-x', value='time', searchable=True, clearable=False)
                     ]),
                 ]),
                 dmc.AccordionItem(id='prop-prop-y-item', style={'visibility':'hidden'}, value='prop-prop-y-accordion', children=[
                     dmc.AccordionControl('Property-property Y-axis'),
                     dmc.AccordionPanel(children=[
-                        dmc.Select(id='prop-prop-y', value='fCO2_recommended', searchable=True)
+                        dmc.Select(id='prop-prop-y', value='fCO2_recommended', searchable=True, clearable=False)
                     ]),
                 ]),
                 dmc.AccordionItem(id='prop-prop-colorby-item', style={'visibility':'hidden'}, value='prop-prop-colorby-accordion', children=[
                     dmc.AccordionControl('Property-property Color-by'),
                     dmc.AccordionPanel(children=[
-                        dmc.Select(id='prop-prop-colorby', value='expocode', searchable=True)
+                        dmc.Select(id='prop-prop-colorby', value='expocode', searchable=True, clearable=False)
                     ]),
                 ])
             ])
@@ -682,9 +682,19 @@ def show_selected_points(in_points):
         column_names = sorted(all_data.columns, key=str.casefold)
         column_names.remove('WOCE_CO2_water')
         column_names.insert(0, 'WOCE_CO2_water')
-        columnDefs=[{"field": i, "headerName": i, 'editable': True, 'sortable': True, 'cellEditor': 'agSelectCellEditor', 'cellEditorParams':
-                    {'values': ['2', '3', '4']}
-                    } if 'WOCE' in i else {"field": i, "headerName": i} for i in column_names]
+        columnDefs = []
+        for i in column_names:
+            if 'WOCE' in i:
+                columnDefs.append(
+                    {
+                        "field": i, "headerName": i, 'editable': True, 'sortable': True, 'cellEditor': 'agSelectCellEditor', 
+                        'cellEditorParams': {'values': ['2', '3', '4']}
+                    }
+                )
+            elif 'time' in i:
+                columnDefs.append({"field": i, "headerName": i, 'sortable': True})
+            else:
+                columnDefs.append({"field": i, "headerName": i})
         selected_points = in_points['points']
         times = []
         for point in selected_points:
@@ -873,7 +883,7 @@ def update_plots(plot_data_store, in_plot_type, in_prop_prop_x, in_prop_prop_y, 
         #DEBUG print('plot done height set')
         # figure.update_traces(connectgaps=False)
     elif in_plot_type == 'prop-prop':
-        card_title = in_prop_prop_y + ' vs ' + in_prop_prop_x + ' colored by ' + in_prop_prop_colorby + 'from' + ', '.join(plot_in_expocode)
+        card_title = in_prop_prop_y + ' vs ' + in_prop_prop_x + ' colored by ' + in_prop_prop_colorby + ' from ' + ', '.join(plot_in_expocode)
         figure = px.scatter(to_plot,
                             x=in_prop_prop_x,
                             y=in_prop_prop_y,
@@ -882,6 +892,7 @@ def update_plots(plot_data_store, in_plot_type, in_prop_prop_x, in_prop_prop_y, 
                             hover_data=['time',in_prop_prop_x,in_prop_prop_y,in_prop_prop_colorby],
                             custom_data=['time'],
                             color_discrete_sequence=cmap,
+                            category_orders={"WOCE_CO2_water": ["2", "3", "4", "5", "1"]},
                             color_continuous_scale=px.colors.sequential.Viridis
         )
         figure.update_layout(height=450)
@@ -919,6 +930,7 @@ def update_plots(plot_data_store, in_plot_type, in_prop_prop_x, in_prop_prop_y, 
                         hover_data=['time','latitude','longitude','expocode', x, y, color_by],
                         custom_data=['time'],
                         color_discrete_sequence=cmap,
+                        category_orders={"WOCE_CO2_water": ["2", "3", "4", "5","1"]},
                         # color_continuous_scale=px.colors.sequential.Viridis,
                     )
             subplot.update_traces(legend=leg)
