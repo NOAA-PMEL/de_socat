@@ -298,7 +298,7 @@ app.layout = dmc.Container(fluid=True, children=[
                 dmc.AccordionItem(value='plot-type-accordion', children=[
                     dmc.AccordionControl('Plot Type:'),
                     dmc.AccordionPanel([
-                        dmc.Select(id='plot-type', value='timeseries', clearable=False,
+                        dmc.Select(id='plot-type', value='prop-prop', clearable=False,
                             data=[
                                 {'label': 'Timeseries', 'value': 'timeseries'},
                                 {'label': 'Property-Property', 'value': 'prop-prop'},
@@ -352,7 +352,7 @@ app.layout = dmc.Container(fluid=True, children=[
             dmc.Col(span=12, children=[
                 dmc.Button("Save", id='edit-save'),
                 dmc.Button("Cancel", id='edit-cancel', color='yellow'),
-                dcc.Loading(dag.AgGrid(id='selected-points', dashGridOptions={'pagination':True, "paginationAutoPageSize": True}, style={'height': '80vh'})),
+                dcc.Loading(dag.AgGrid(id='selected-points', dashGridOptions={'pagination':True, "paginationAutoPageSize": True, "tooltipShowDelay": 0}, style={'height': '80vh'})),
             ])
         ]),
     ]),
@@ -418,7 +418,7 @@ def modal_open_edit(in_selected_data, save_button, cancel_button, rowData, opene
 
 
 @app.callback(
-    Output("modal-cruise-table", "opened"),
+    Output("modal-cruise-table", "opened", allow_duplicate=True),
     Input('table-of-cruises-button', "n_clicks"),
     State("modal-cruise-table", "opened"),
     prevent_initial_call=True,
@@ -687,8 +687,8 @@ def show_selected_points(in_points):
             if 'WOCE' in i:
                 columnDefs.append(
                     {
-                        "field": i, "headerName": i, 'editable': True, 'sortable': True, 'cellEditor': 'agSelectCellEditor', 
-                        'cellEditorParams': {'values': ['2', '3', '4']}
+                        "field": i, "headerName": i, 'editable': True, 'sortable': True, 'cellEditor': 'agSelectCellEditor', "tooltipComponent": "CustomTooltip",
+                        'cellEditorParams': {'values': ['2', '3', '4']},"tooltipField": i, 'tooltipShowDelay': 0
                     }
                 )
             elif 'time' in i:
@@ -738,7 +738,7 @@ def selectData(selectData):
 
 @app.callback(
     [
-        Output('expocode', 'value')
+        Output('expocode', 'value', allow_duplicate=True)
     ],
     [
         Input('map-graph', 'clickData')
@@ -893,7 +893,7 @@ def update_plots(plot_data_store, in_plot_type, in_prop_prop_x, in_prop_prop_y, 
                             custom_data=['time'],
                             color_discrete_sequence=cmap,
                             category_orders={"WOCE_CO2_water": ["2", "3", "4", "5", "1"]},
-                            color_continuous_scale=px.colors.sequential.Viridis
+                            color_continuous_scale=px.colors.sequential.Viridis,
         )
         figure.update_layout(height=450)
     elif in_plot_type == 'prop-prop-thumbs':
@@ -969,6 +969,26 @@ def update_plots(plot_data_store, in_plot_type, in_prop_prop_x, in_prop_prop_y, 
 
 @app.callback(
     [
+        Output('expocode', 'value', allow_duplicate=True),
+        Output('plot-type', 'value'),
+        Output("modal-cruise-table", "opened", allow_duplicate=True),
+    ],
+    [
+        Input('table-of-cruises', 'cellClicked')
+    ], prevent_initial_call=True
+)
+def set_expo_from_table_click(cell):
+    print(f"clicked on cell value:  {cell['value']}, column:   {cell['colId']}, row index:   {cell['rowIndex']}")
+    if cell['colId'] == 'expocode':
+        return [[cell['value']],'prop-prop', False]
+    elif cell['colId'] == 'thumbnails':
+        return [[cell['value']],'prop-prop-thumbs', False]
+    else:
+        raise exceptions.PreventUpdate
+
+
+@app.callback(
+    [
         Output('table-of-cruises', 'rowData'),
         Output('table-of-cruises', 'columnDefs')
     ],
@@ -1012,7 +1032,16 @@ def make_table_of_crusies(da_click, mt_in_start_date, mt_in_end_date, mt_in_woce
     expo_options = []
     print('table URL: ' + url)
     df = pd.read_csv(url, skiprows=[1])
-    columnDefs = [{"field": i, "headerName": i} for i in sorted(df.columns, key=str.casefold)]      
+    df['thumbnails'] = df.loc[:, 'expocode']
+    df['documentation'] = 'https://data.pmel.noaa.gov/socat/las/MetadataDocsV2023/' + df.expocode.str.slice(start=0, stop=4) + '/' +  df.expocode + '/'
+    columnDefs = []   
+    for i in sorted(df.columns, key=str.casefold):
+        if i == 'expocode' or i == 'thumbnails':
+            columnDefs.append({"field": i, "headerName": i, 'cellStyle': {'color': 'blue', 'text-decoration': 'underline'}})
+        elif i == 'documentation':
+            columnDefs.append({"field": i, "headerName": i, 'cellRenderer': "DocLink", 'cellStyle': {'color': 'blue', 'text-decoration': 'underline'}})
+        else:
+            columnDefs.append({"field": i, "headerName": i})
     return [df.to_dict("records"), columnDefs]
 
 
