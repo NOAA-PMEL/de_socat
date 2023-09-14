@@ -1,4 +1,4 @@
-from dash import Dash, dcc, html, Input, Output, State, exceptions, callback_context, ALL
+from dash import Dash, dcc, html, Input, Output, State, exceptions, callback_context, ALL, no_update
 import dash_design_kit as ddk
 import plotly.graph_objects as go
 import plotly.express as px
@@ -109,6 +109,14 @@ full_url = 'https://data.pmel.noaa.gov/socat/erddap/tabledap/socat_v2022_fulldat
 # Define Dash application structure
 app = Dash(__name__)
 server = app.server  # expose server variable for Procfile
+
+dinfo = Info(decimated_url)
+variables, long_names, standard_name, units, v_d_types = dinfo.get_variables()
+variable_options = []
+for var in variables:   
+    if var != 'lat_meters' and var != 'lon_meters':
+        variable_options.append({'label':var, 'value': var})
+start_date, end_date, start_seconds, end_seconds = dinfo.get_times()
 
 app.layout = dmc.Container(fluid=True, children=[
     dmc.Header(height=90, children=[
@@ -283,9 +291,14 @@ app.layout = dmc.Container(fluid=True, children=[
     ]),
     dmc.Grid(id='plot-grid', children=[
         dmc.Col(id='plot-controls', span=3, children=[
+            
+
+ 
+
             dmc.Group(position='apart', children=[
                 dmc.Text('Plot Controls', size='lg', weight=500, ml='lg'),
             ]),
+
             dmc.AccordionMultiple(style={'height': '350px', 'overflow': 'auto', 'overflow-x': 'hidden'},  chevronPosition="left", variant='contained', 
                                   value=['plot-type-accordion', 'expocode-accordion'],
                                 children=[
@@ -331,7 +344,13 @@ app.layout = dmc.Container(fluid=True, children=[
             dmc.Card(children=[
                 dmc.CardSection(mt='lg', mx='sm', children=[
                     dcc.Loading(type='dot', color='white', children=[
-                        dmc.Text(id='one-graph-header',  size='lg', weight=500, ml='lg', mt='lg')
+                        dmc.Group(children=[
+                            dmc.Text(id='one-graph-header',  size='lg', weight=500, ml='lg', mt='lg'),
+                            dmc.Text('Data from this plot:      ',  size='lg', weight=500, ml='lg', mt='lg'),
+                            dmc.Anchor(id='show', children=[dmc.Button("Show", id='show-button', compact=True, style={'margin-top':'15px'})], href=full_url, target='_blank'),
+                            dmc.Anchor(id='csv', children=[dmc.Button('CSV', id='csv-button', compact=True, style={'margin-top':'15px'})], href=full_url, target='_blank'),
+                            dmc.Anchor(id='netcdf', children=[dmc.Button('netCDF', id='netcdf-button', compact=True, style={'margin-top':'15px'})], href=full_url, target='_blank')
+                        ])
                     ])
                 ]),
                 dmc.CardSection(
@@ -350,8 +369,19 @@ app.layout = dmc.Container(fluid=True, children=[
     dmc.Modal(id="modal-edit-table", title="Selected Points", overflow="hidden", size="95%", zIndex=10000, style={'height': '95%'}, children=[
         dmc.Grid(id='edit-grid', children=[
             dmc.Col(span=12, children=[
-                dmc.Button("Save", id='edit-save'),
-                dmc.Button("Cancel", id='edit-cancel', color='yellow'),
+                dmc.Col(span=2, children=[
+                    dmc.Button("Save", id='edit-save'),
+                    dmc.Button("Cancel", id='edit-cancel', color='yellow'),
+                ]),
+                dmc.Col(span=10, children=[
+                    dmc.Textarea(id='comment',
+                        label="Comment:",
+                        placeholder="You must provide a comment when saving changes to the flags.",
+                        style={"width": 500},
+                        autosize=True,
+                        minRows=2,
+                    ),
+                ]),
                 dcc.Loading(dag.AgGrid(id='selected-points', dashGridOptions={'pagination':True, "paginationAutoPageSize": True, "tooltipShowDelay": 0}, style={'height': '80vh'})),
             ])
         ]),
@@ -390,20 +420,29 @@ def modal_open_debug(show_button, delete_button, opened):
 
 @app.callback(
     Output("modal-edit-table", "opened"),
+    Output('comment', 'value'),
     Input('one-graph', 'selectedData'),
     Input('edit-save', 'n_clicks'),
     Input('edit-cancel', 'n_clicks'),
     State('selected-points', 'rowData'),
     State("modal-edit-table", "opened"),
+    State('comment','value'),
     prevent_initial_call=True,
 )
-def modal_open_edit(in_selected_data, save_button, cancel_button, rowData, opened):
+def modal_open_edit(in_selected_data, save_button, cancel_button, rowData, opened, in_comment):
+    reminder = 'You must supply a comment.'
+    ex_reminder = 'No, really. You must supply a comment telling what you did and why.'
     if in_selected_data is None: 
         raise exceptions.PreventUpdate
     if len(in_selected_data['points']) == 0:
         raise exceptions.PreventUpdate
     triggered_id = callback_context.triggered_id
     if triggered_id == 'edit-save':
+        if in_comment is None or len(in_comment) == 0 or in_comment == reminder or in_comment == ex_reminder:
+            if in_comment == reminder:
+                return no_update, ex_reminder
+            else:
+                return no_update, reminder
         selected_data = pd.read_json(redis_instance.hget("cache","edit-table-data"))
         as_edited = pd.DataFrame(rowData)
         edits = pd.concat([selected_data, as_edited]).drop_duplicates(keep=False)
@@ -412,9 +451,10 @@ def modal_open_edit(in_selected_data, save_button, cancel_button, rowData, opene
         d = str(d)
         d = d.replace(d[-7:], 'Z')
         edits.loc[:, 'edit_timestamp'] = d
+        edits.loc[:, 'comment'] = in_comment
         save_edits = edits.iloc[start:]
         save_edits.to_sql(edits_table, postgres_engine, if_exists='append', index=False)
-    return not opened
+    return not opened, ''
 
 
 @app.callback(
@@ -448,13 +488,7 @@ def modal_open_cruise(header_button, opened):
     ]
 )
 def set_up(click_in):
-    dinfo = Info(decimated_url)
-    variables, long_names, standard_name, units, v_d_types = dinfo.get_variables()
-    variable_options = []
-    for var in variables:   
-        if var != 'lat_meters' and var != 'lon_meters':
-            variable_options.append({'label':var, 'value': var})
-    start_date, end_date, start_seconds, end_seconds = dinfo.get_times()
+    
     inv_url = decimated_url + '.csv?investigators&distinct()'
     inv_df = pd.read_csv(inv_url, skiprows=[1])
     investigator_options = []
@@ -472,7 +506,13 @@ def set_up(click_in):
     [
         Output('trace-graph', 'figure'),
         Output('trace-graph-header', 'children'),
-        Output('plot-data-change', 'data')
+        Output('plot-data-change', 'data'),
+        Output('show', 'href'),
+        Output('show-button', 'disabled'),
+        Output('csv', 'href'),
+        Output('csv-button', 'disabled'),
+        Output('netcdf', 'href'),
+        Output('netcdf-button', 'disabled')
     ],
     [
         Input('expocode','value')
@@ -487,7 +527,6 @@ def update_trace(trace_in_expocode, trace_in_variable):
     vars_to_get = ['latitude', 'longitude', 'time', 'expocode', trace_in_variable,] 
     if trace_in_expocode is not None and len(trace_in_expocode) > 0:
         expo_con = Info.make_platform_constraint('expocode', trace_in_expocode)
-        print(expo_con['con'])
     if len(expo_con['con']) > 0:
         vars_to_get.extend(thumbnail_vars)
         vars_to_get = list(set(vars_to_get))
@@ -499,11 +538,12 @@ def update_trace(trace_in_expocode, trace_in_variable):
         raise exceptions.PreventUpdate
     print('plot url = ' + url)
     df = pd.read_csv(url, skiprows=[1])
+    netcdf_url = url.replace('csv', 'ncCF')
+    table_url = url.replace('csv', 'htmlTable')
     df = df.loc[df[trace_in_variable].notna()]
     rmin = df[trace_in_variable].min()
     rmax = df[trace_in_variable].max()
     lat_min, lat_max, lon_min, lon_max, fitbounds = get_map_ranges(df)
-    print(lat_min, lat_max, lon_min, lon_max, fitbounds)
     figure = px.scatter_geo(df,
                             lat='latitude',
                             lon='longitude',
@@ -520,7 +560,7 @@ def update_trace(trace_in_expocode, trace_in_variable):
     figure.update_coloraxes(colorbar={'orientation':'h', 'thickness':20, 'y': -.175, 'title': None})
     title = 'All ' + trace_in_variable + ' data from crusies ' + str(trace_in_expocode)
     redis_instance.hset("cache", 'plot-data', df.to_json())
-    return [figure, title, 'yes']
+    return [figure, title, 'yes', table_url, False, url, False, netcdf_url, False]
 
 @app.callback(
     [
@@ -546,7 +586,9 @@ def update_trace(trace_in_expocode, trace_in_variable):
 )
 def update_map(map_in_variable, in_regions, in_woce_water, in_start_date, in_end_date, in_investigator, in_org, in_qc_flag, in_platform_type, map_info, map_in_expocode):
 
-    vars_to_get = ['latitude','longitude','time','expocode',map_in_variable] 
+    vars_to_get = ['latitude','longitude','time','expocode']
+    if map_in_variable not in vars_to_get:
+        vars_to_get.append(map_in_variable)
     time_con = '&time>='+in_start_date+'&time<='+in_end_date
     investigator_con = util.make_con('investigators', in_investigator)
     if investigator_con:
@@ -572,7 +614,7 @@ def update_map(map_in_variable, in_regions, in_woce_water, in_start_date, in_end
         cons = maputil.get_socat_subset(bounds['ll']['longitude'], bounds['ur']['longitude'],bounds['ll']['latitude'],bounds['ur']['latitude'])
         url = url + cons['lat'] + cons['lon']
     expo_options = []
-    print('map URL: ' + url)
+    print('Map URL: ' + url)
     try:
         df = pd.read_csv(url, skiprows=[1])
     except:
@@ -618,15 +660,29 @@ def update_map(map_in_variable, in_regions, in_woce_water, in_start_date, in_end
             figure.update_geos(lonaxis_range=[lon_min,lon_max], lataxis_range=[lat_min,lat_max])
         figure.update_traces(marker=dict(size=6))
     else:
-        title = 'Mean of ' + map_in_variable + ' from ' + in_start_date + ' to ' + in_end_date
-        # DEBUG print('making a datashader plot')
-        cvs = ds.Canvas(plot_width=agg_x, plot_height=agg_y, x_range=[-180,180], y_range=[-90,90],)
-        agg = cvs.points(df, 'longitude', 'latitude', ds.mean(map_in_variable))
+        if v_d_types[map_in_variable] == 'String':
+            # Count categories
+            title = 'Count of ' + map_in_variable + ' from ' + in_start_date + ' to ' + in_end_date
+            # DEBUG print('making a datashader plot')
+            df[map_in_variable] = df[map_in_variable].astype('category')
+            cvs = ds.Canvas(plot_width=agg_x, plot_height=agg_y, x_range=[-180,180], y_range=[-90,90],)
+            agg = cvs.points(df, 'longitude', 'latitude', ds.by(map_in_variable, ds.count()))
+            agg = agg.where(agg>0)
+            agg = agg.count(dim=map_in_variable)
+        else:           
+            title = 'Mean of ' + map_in_variable + ' from ' + in_start_date + ' to ' + in_end_date
+            # DEBUG print('making a datashader plot')
+            cvs = ds.Canvas(plot_width=agg_x, plot_height=agg_y, x_range=[-180,180], y_range=[-90,90],)
+            agg = cvs.points(df, 'longitude', 'latitude', ds.mean(map_in_variable))
         sdf = agg.to_pandas()
         pdf = sdf.unstack()
         qdf = pdf.to_frame().reset_index()
         qdf.columns=['longitude','latitude',map_in_variable]
-        qdf = qdf.loc[qdf[map_in_variable].notna()]
+        if v_d_types[map_in_variable] == 'String':
+            qdf[map_in_variable] = qdf[map_in_variable].astype(int)
+            qdf = qdf[qdf[map_in_variable] != 0]
+        else:
+            qdf = qdf.loc[qdf[map_in_variable].notna()]
         if 'fCO2' in map_in_variable:
             rmin = 160
             rmax = 560
@@ -749,24 +805,20 @@ def selectData(selectData):
 )
 def set_platform_code_from_map(in_click, state_in_expovalue):
     out_expocode = None
-    print('=-=-=-=-=- starting set_platform_code_from_map =-=-=-=-=-=')
-    # DEBUG 
-    print('printing click')
-    # DEBUG 
-    print(str(in_click))
+    # DEBUG print('=-=-=-=-=- starting set_platform_code_from_map =-=-=-=-=-=')
+    # DEBUG     print('printing click')
+    # DEBUG     print(str(in_click))
     if in_click is not None:
-        # DEBUG 
-        print('getting first point')
+        # DEBUG         print('getting first point')
         fst_point = in_click['points'][0]
-        # DEBUG 
-        print(fst_point)
+        # DEBUG         print(fst_point)
         if 'customdata' in fst_point:
             out_expocode = fst_point['customdata']
             out_value = out_expocode[0]
-            print('expo to add because of click ' + out_value)
-            print('existing expo ' + str(state_in_expovalue))
+            # DEBUG print('expo to add because of click ' + out_value)
+            #DEBUG print('existing expo ' + str(state_in_expovalue))
         else:
-            print('no custom data in click')
+            # DEBUG print('no custom data in click')
             raise exceptions.PreventUpdate
     if state_in_expovalue is not None and len(state_in_expovalue) > 0:
         if isinstance(state_in_expovalue, str):
@@ -776,12 +828,12 @@ def set_platform_code_from_map(in_click, state_in_expovalue):
             out_value = [state_in_expovalue]
     if isinstance(out_value, list):
         new_lst = [item for item in out_value if item is not None]
-        print('map selection is returning expo value of ' + str(new_lst))
-        print('=-=-=-=-=- Finished (new_lst) set_platform_code_from_map =-=-=-=-=-=')
+        # DEBUG print('map selection is returning expo value of ' + str(new_lst))
+        # DEBUG print('=-=-=-=-=- Finished (new_lst) set_platform_code_from_map =-=-=-=-=-=')
         return new_lst
     else:
-        print('map selection is returning expo value of ' + str(out_value))
-        print('=-=-=-=-=- Finished (out_value) set_platform_code_from_map =-=-=-=-=-=')
+        # DEBUG print('map selection is returning expo value of ' + str(out_value))
+        # DEBUG print('=-=-=-=-=- Finished (out_value) set_platform_code_from_map =-=-=-=-=-=')
         return [[out_value]]
 
 
@@ -811,9 +863,9 @@ def set_visibility_trace(in_expocode):
 )    
 def set_visibility_plot(plot_data, in_expocode):
     if (in_expocode is None or len(in_expocode) < 1) or (plot_data is None or plot_data == 'no'):
-        return [hidden]
+        return [hidden,]
     else:
-        return [visible]
+        return [visible,]
 
     
 
@@ -840,15 +892,15 @@ def update_plots(plot_data_store, in_plot_type, in_prop_prop_x, in_prop_prop_y, 
     x_label = None
     y_label = None
     legend_title = None
-    print('updating the timeseries plot ' + str(plot_in_expocode))
+    # DEBUG print('updating the timeseries plot ' + str(plot_in_expocode))
     if plot_in_expocode is None or len(plot_in_expocode) == 0:
-        print('data-plot: no expo')
+        # DEBUG print('data-plot: no expo')
         raise exceptions.PreventUpdate
     if in_map_variable is None or len(in_map_variable) == 0:
-        print('data-plot: no variable')
+        # DEBUG print('data-plot: no variable')
         raise exceptions.PreventUpdate
     if plot_data_store == 'no':
-        print('no new data')
+        # DEBUG print('no new data')
         raise exceptions.PreventUpdate
     
     to_plot = pd.read_json(redis_instance.hget("cache","plot-data"))
@@ -978,7 +1030,7 @@ def update_plots(plot_data_store, in_plot_type, in_prop_prop_x, in_prop_prop_y, 
     ], prevent_initial_call=True
 )
 def set_expo_from_table_click(cell):
-    print(f"clicked on cell value:  {cell['value']}, column:   {cell['colId']}, row index:   {cell['rowIndex']}")
+    # DEBUG print(f"clicked on cell value:  {cell['value']}, column:   {cell['colId']}, row index:   {cell['rowIndex']}")
     if cell['colId'] == 'expocode':
         return [[cell['value']],'prop-prop', False]
     elif cell['colId'] == 'thumbnails':
