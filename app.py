@@ -26,6 +26,8 @@ import util
 import dash_ag_grid as dag
 from sdig.erddap.info import Info
 import db
+from itertools import compress
+
 
 from sqlalchemy import create_engine
 from sqlalchemy.pool import NullPool
@@ -84,6 +86,29 @@ thumbnail_pairs = [
     ['time','xCO2_water_sst_dry_ppm','WOCE_CO2_water']
 ]
 
+socatQC = { 
+				'validExpoChars': "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-",
+
+				'fco2two': "Accuracy of calculated fCO2w (at SST) less than 2 uatm",
+				'fco2five': "Accuracy of calculated fCO2w (at SST) less than 5 uatm",
+				'fco2ten': "Accuracy of calculated fCO2w (at SST) less than 10 uatm",
+				'fco2bad': "Accuracy of calculated fCO2w (at SST) more than 10 uatm",
+
+				'soptrue': "Followed standard methods/SOP",
+				'sopfalse': "Did not follow standard methods/SOP",
+
+				'metacomplete': "Metadata complete",
+				'metalacking': "Metadata not complete",
+
+				'datagood': "Data quality acceptable",
+				'databad': "Significant amount of unacceptable-quality data",
+
+				'crossfound': "High-quality cross-over with ",
+				'crossnone': "No high-quality cross-overs found at the time of this QC",
+
+				'commentSpacer': ".  "
+			}
+
 thumbnail_vars = []
 for sub_list in thumbnail_pairs:
     thumbnail_vars.extend(sub_list)
@@ -109,6 +134,8 @@ full_url = 'https://data.pmel.noaa.gov/socat/erddap/tabledap/socat_v2022_fulldat
 # Define Dash application structure
 app = Dash(__name__)
 server = app.server  # expose server variable for Procfile
+
+months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
 dinfo = Info(decimated_url)
 variables, long_names, standard_name, units, v_d_types = dinfo.get_variables()
@@ -240,6 +267,37 @@ app.layout = dmc.Container(fluid=True, children=[
                                         {'label': "Ship", 'value': "Ship"}
                                     ]),                                
                                 ])
+                            ]),
+                            dmc.AccordionItem(value='season-item', children=[
+                                dmc.AccordionControl("Season:"),
+                                dmc.AccordionPanel(children=[
+                                    dmc.Grid(style={'margin-top': '20px'}, children=[
+                                        dmc.Group(children=[
+                                            dmc.Switch(id='jan-sw', onLabel="Jan", offLabel="Jan", size="lg", checked=False),
+                                            dmc.Switch(id='feb-sw', onLabel="Feb", offLabel="Feb", size="lg", checked=False),
+                                            dmc.Switch(id='mar-sw', onLabel="Mar", offLabel="Mar", size="lg", checked=False),
+                                            dmc.Switch(id='apr-sw', onLabel="Apr", offLabel="Apr", size="lg", checked=False),
+                                        ]),
+                                        dmc.Group(children=[
+                                            dmc.Switch(id='dec-sw', onLabel="Dec", offLabel="Dec", size="lg", checked=False),
+                                            dmc.Switch(size='lg', style={'visibility': 'hidden'}),
+                                            dmc.Switch(size='lg', style={'visibility': 'hidden'}),
+                                            dmc.Switch(id='may-sw', onLabel="May", offLabel="May", size="lg", checked=False),
+                                        ]),
+                                        dmc.Group(children=[
+                                            dmc.Switch(id='nov-sw', onLabel="Nov", offLabel="Nov", size="lg", checked=False),
+                                            dmc.Switch(size='lg', style={'visibility': 'hidden'}),
+                                            dmc.Switch(size='lg', style={'visibility': 'hidden'}),
+                                            dmc.Switch(id='jun-sw', onLabel="Jun", offLabel="Jun", size="lg", checked=False),
+                                        ]),
+                                        dmc.Group(children=[
+                                            dmc.Switch(id='oct-sw', onLabel="Oct", offLabel="Oct", size="lg", checked=False),
+                                            dmc.Switch(id='sep-sw', onLabel="Sep", offLabel="Sep", size="lg", checked=False),
+                                            dmc.Switch(id='aug-sw', onLabel="Aug", offLabel="Aug", size="lg", checked=False),
+                                            dmc.Switch(id='jul-sw', onLabel="Jul", offLabel="Jul", size="lg", checked=False),
+                                        ])
+                                    ])
+                                ])
                             ])
                         ],
                         )
@@ -349,7 +407,9 @@ app.layout = dmc.Container(fluid=True, children=[
                             dmc.Text('Data from this plot:      ',  size='lg', weight=500, ml='lg', mt='lg'),
                             dmc.Anchor(id='show', children=[dmc.Button("Show", id='show-button', compact=True, style={'margin-top':'15px'})], href=full_url, target='_blank'),
                             dmc.Anchor(id='csv', children=[dmc.Button('CSV', id='csv-button', compact=True, style={'margin-top':'15px'})], href=full_url, target='_blank'),
-                            dmc.Anchor(id='netcdf', children=[dmc.Button('netCDF', id='netcdf-button', compact=True, style={'margin-top':'15px'})], href=full_url, target='_blank')
+                            dmc.Anchor(id='netcdf', children=[dmc.Button('netCDF', id='netcdf-button', compact=True, style={'margin-top':'15px'})], href=full_url, target='_blank'),
+                            dmc.Text('Cruise QC:      ',  size='lg', weight=500, ml='lg', mt='lg'),
+                            dmc.Button('Show', id='cruise-qc-button', compact=True, style={'margin-top':'15px'})
                         ])
                     ])
                 ]),
@@ -362,7 +422,11 @@ app.layout = dmc.Container(fluid=True, children=[
     dmc.Modal(id="modal-cruise-table", title="Table of Cruises", overflow="inside", size="95%", zIndex=10000, children=[
         dmc.Grid(id='table-grid', children=[
             dmc.Col(span=12, children=[
-                dcc.Loading(dag.AgGrid(id='table-of-cruises', dashGridOptions={'pagination':True, "paginationAutoPageSize": True}, style={'height': '80vh'})),
+                dcc.Loading(dag.AgGrid(id='table-of-cruises', 
+                                       dashGridOptions={'pagination':True, "paginationAutoPageSize": True}, 
+                                       columnSize="sizeToFit",
+                                       defaultColDef={"resizable": True},
+                                       style={'height': '80vh'})),
             ])
         ])
     ]),
@@ -382,20 +446,154 @@ app.layout = dmc.Container(fluid=True, children=[
                         minRows=2,
                     ),
                 ]),
-                dcc.Loading(dag.AgGrid(id='selected-points', dashGridOptions={'pagination':True, "paginationAutoPageSize": True, "tooltipShowDelay": 0}, style={'height': '80vh'})),
+                dcc.Loading(dag.AgGrid(id='selected-points', 
+                                       dashGridOptions={'pagination':True, "paginationAutoPageSize": True, "tooltipShowDelay": 0},
+                                       columnSize="sizeToFit",
+                                       defaultColDef={"resizable": True},
+                                       style={'height': '80vh'})),
             ])
         ]),
+    ]),
+    dmc.Modal(id="cruise-qc-table", title="Cruise QC History", overflow="hidden", size="95%", zIndex=10000, children=[
+        dmc.Grid(id='cruise-qc-display', children=[
+            dmc.Col(span=12, children=[
+                dmc.Button("Add QC", id='add-cruise-qc'),
+                dcc.Loading(dag.AgGrid(id='cruise-qc-grid', 
+                                       dashGridOptions={'pagination':True},
+                                       columnSize="sizeToFit",
+                                       defaultColDef={"resizable": True},
+                                       style={'height': '80vh'})),
+            ])
+        ])
     ]),
     dmc.Modal(id="modal-review-table", title="Edited Rows Points", overflow="hidden", size="95%", zIndex=10000, children=[
         dmc.Grid(id='edited-display', children=[
             dmc.Col(span=12, children=[
                 dmc.Button("DELETE All Rows", id='edit-delete'),
-                dcc.Loading(dag.AgGrid(id='edited-points', dashGridOptions={'pagination':True}, style={'height': '80vh'})),
+                dcc.Loading(dag.AgGrid(id='edited-points', 
+                                       dashGridOptions={'pagination':True}, 
+                                       columnSize="sizeToFit",
+                                       defaultColDef={"resizable": True},
+                                       style={'height': '80vh'})),
             ])
         ])
     ]),
+    dmc.Modal(id="modal-cruise-flags", title="Add QC", overflow="hidden", size="75%", zIndex=10000, children=[
+        dmc.Grid(id='edit-cruise-qc', children=[
+            dmc.Col(span=12, children=[
+                dmc.Button("Save", id='cruise-qc-save'),
+                dmc.Button("Cancel", id='cruise-qc-cancel', color='yellow'),
+                dmc.Text("QC for", size='lg', weight=500,),
+                dmc.Text("Regions", size='lg', weight=500,),
+                html.Div(style={'margin-left': '100px'}, children=[
+                    dmc.Checkbox(label="Coastal"),
+                    dmc.Checkbox(label="Global (Override regional QC flags)"),
+                ]),
+                dmc.Text("Quality Control Criteria:", size='lg', weight=500,),
+                dmc.RadioGroup(id='fco2-comment', label="Accuracy of calculated aqueous fCO2 at SST:", orientation='vertical', style={'margin-left': '100px'}, children=[
+                    dmc.Radio('< 2 μatm (A, B)', value='fco2two'),
+                    dmc.Radio('< 5 μatm (C, D)', value='fco2five'),
+                    dmc.Radio('< 10 μatm (E)', value='fco2ten'),
+                    dmc.Radio('> 10 μatm (F, S)', value='fco2bad'),
+                    dmc.Radio('(no comment)', value='fco2no'),
+                ]),
+                dmc.RadioGroup(id='sop-comment', label='Followed approved methods/SOP criteria:', orientation='vertical', style={'margin-left': '100px'}, children=[
+                    dmc.Radio('true (A, B)', value='soptrue'),
+                    dmc.Radio('false (C, D, E) - specify not followed in additional comments', value='sopfalse'),
+                    dmc.Radio('(no comment)', value='sopno')
+                ]),
+                dmc.RadioGroup(id='meta-comment', label='Metadata documentation:', orientation='vertical', style={'margin-left': '100px'}, children=[
+                    dmc.Radio('complete (A, B, C, E)', value='metacomplete'),
+                    dmc.Radio('incomplete (D) - specify missing in additional comments', value='metalacking'),
+                    dmc.Radio('(no comment)', value='metano')
+                ]),
+                dmc.RadioGroup(id='data-comment', label='Data quality:', orientation='vertical', style={'margin-left': '100px'}, children=[
+                    dmc.Radio('acceptable (A, B, C, D, E)', value='datagood'),
+                    dmc.Radio('significant amount of unacceptable data (F, S)', value='databad'),
+                    dmc.Radio('(no comment)', value='datano')
+                ]),
+                dmc.RadioGroup(id='xover-comment', label='High-quality cross-over:', orientation='vertical', style={'margin-left': '100px'}, children=[
+                    dmc.Radio('found with dataset (A)', value='crossfound'),
+                    dmc.Radio('none found (B, C, D, E)', value='crossnone'),
+                    dmc.Radio('(no comment)', value='crossno')
+                ]),              
+            ]),
+        ]),
+    ]),
+    dmc.Modal(id="modal-cruise-comments", title="Add Comments", overflow="hidden", size="75%", zIndex=10000, children=[
+        dmc.Grid(id='edit-cruise-comments', children=[
+            dmc.Col(span=12, children=[
+                dmc.Button("Save", id='cruise-comments-save'),
+                dmc.Button("Cancel", id='cruise-comments-cancel', color='yellow'),
+                dmc.Text("QC for", size='lg', weight=500,),
+                dmc.Textarea(id='added-comments', placeholder='Add any additional comments here.'),
+                dmc.Text(id='full-comment', size='lg', weight=500,),
+            ]),
+        ]),
+    ]),
 ])
 
+
+@app.callback(
+    [
+        Output('jan-sw', 'disabled'),
+        Output('feb-sw', 'disabled'),
+        Output('mar-sw', 'disabled'),
+        Output('apr-sw', 'disabled'),
+        Output('may-sw', 'disabled'),
+        Output('jun-sw', 'disabled'),
+        Output('jul-sw', 'disabled'),
+        Output('aug-sw', 'disabled'),
+        Output('sep-sw', 'disabled'),
+        Output('oct-sw', 'disabled'),
+        Output('nov-sw', 'disabled'),
+        Output('dec-sw', 'disabled'),
+    ],
+    [
+        Input('jan-sw', 'checked'),
+        Input('feb-sw', 'checked'),
+        Input('mar-sw', 'checked'),
+        Input('apr-sw', 'checked'),
+        Input('may-sw', 'checked'),
+        Input('jun-sw', 'checked'),
+        Input('jul-sw', 'checked'),
+        Input('aug-sw', 'checked'),
+        Input('sep-sw', 'checked'),
+        Input('oct-sw', 'checked'),
+        Input('nov-sw', 'checked'),
+        Input('dec-sw', 'checked'),        
+    ], prevent_initial_call=True
+
+)
+def set_season(jan_sw, feb_sw, mar_sw, apr_sw, may_sw, jun_sw, jul_sw, aug_sw, sep_sw, oct_sw, nov_sw, dec_sw):
+    print('season change fired ----------------------')
+    checked = [jan_sw, feb_sw, mar_sw, apr_sw, may_sw, jun_sw, jul_sw, aug_sw, sep_sw, oct_sw, nov_sw, dec_sw]
+    print('checked ----->', checked)
+    disabled = [True, True, True, True, True, True, True, True, True, True, True, True]
+    for i, check in enumerate(checked):
+        print('checking ', i, ' at = ', checked[i])
+        past =  (i-1)
+        future = ((i%12 + 1)%12)
+        if check:
+            print('checked set to false', i)
+            disabled[i] = False            
+        if checked[past] and not checked[future]:
+            print('past and not future', i)
+            disabled[i] = False
+        if not checked[past] and checked[future]:
+            print('not past and future', i)
+            disabled[i] = False
+        if check and checked[past] and checked[future]:
+            print('past and future', i)
+            disabled[i] = True
+    if disabled.count(True) == 12:
+        disabled = [False, False, False, False, False, False, False, False, False, False, False, False]
+    print('disabled ----------|', disabled)
+    print('=-=-=- done --==-=-=-=-')
+    return disabled
+
+
+        
 
 @app.callback(
     Output("modal-review-table", "opened"),
@@ -416,6 +614,57 @@ def modal_open_debug(show_button, delete_button, opened):
         return [not opened, None, None]
     return [not opened, edited_rows.to_dict("records"), columnDefs]
 
+
+@app.callback(
+    Output("modal-cruise-flags", "opened", allow_duplicate=True),
+    Input('add-cruise-qc', 'n_clicks'),
+    State("modal-edit-table", "opened"),
+    # Verify, but I think the expocode has been set in the menu State()
+    prevent_initial_call=True,
+)
+def modal_open_debug(show_button, opened):
+    return [not opened]
+
+
+@app.callback(
+    Output('full-comment', 'children'),
+    Output('modal-cruise-comments', 'opened'),
+    Output('modal-cruise-flags','opened', allow_duplicate=True),
+    Input('cruise-qc-save', 'n_clicks'),
+    State('fco2-comment', 'value'),
+    State('sop-comment', 'value'),
+    State('meta-comment', 'value'),
+    State('data-comment', 'value'),
+    State('xover-comment', 'value'),
+    prevent_initial_call=True
+) 
+def show_and_save_comments(click, fco2, sop, meta, data, xover):
+    print('qc flag saved')
+    full_comment = ''
+    if fco2 is not None and fco2 != 'fco2no':
+        full_comment = full_comment + socatQC[fco2]
+        print('added a comment ', full_comment)
+    if sop is not None and sop != 'sopno':
+        if len(full_comment) > 0:
+            full_comment = full_comment + socatQC['commentSpacer']
+        full_comment = full_comment + socatQC[sop]
+        print('add sop comment ', full_comment)
+    if meta is not None and meta != 'metano':
+        if len(full_comment) > 0:
+            full_comment = full_comment + socatQC['commentSpacer']
+        full_comment = full_comment + socatQC[meta]
+    if data is not None and data != 'datano':
+        if len(full_comment) > 0:
+            full_comment = full_comment + socatQC['commentSpacer']
+        full_comment = full_comment + socatQC[data]
+    if xover is not None and xover != 'crossno':
+        if len(full_comment) > 0:
+            full_comment = full_comment + socatQC['commentSpacer']
+        full_comment = full_comment + socatQC[xover]
+    if len(full_comment) > 0:
+        full_comment = full_comment + '.'
+    print ('final comment ', full_comment)
+    return [full_comment, True, False]
 
 
 @app.callback(
@@ -454,6 +703,7 @@ def modal_open_edit(in_selected_data, save_button, cancel_button, rowData, opene
         edits.loc[:, 'comment'] = in_comment
         save_edits = edits.iloc[start:]
         save_edits.to_sql(edits_table, postgres_engine, if_exists='append', index=False)
+        save_edits.to_sql(edits_table, db.mysql_engine, if_exists='append', index=False)
     return not opened, ''
 
 
@@ -578,15 +828,34 @@ def update_trace(trace_in_expocode, trace_in_variable):
         Input('organization', 'value'),
         Input('qc-flag', 'value'),
         Input('platform-type', 'value'),
-        Input('map-info', 'data')
+        Input('map-info', 'data'),
+        Input('jan-sw', 'checked'),
+        Input('feb-sw', 'checked'),
+        Input('mar-sw', 'checked'),
+        Input('apr-sw', 'checked'),
+        Input('may-sw', 'checked'),
+        Input('jun-sw', 'checked'),
+        Input('jul-sw', 'checked'),
+        Input('aug-sw', 'checked'),
+        Input('sep-sw', 'checked'),
+        Input('oct-sw', 'checked'),
+        Input('nov-sw', 'checked'),
+        Input('dec-sw', 'checked'),  
     ],
     [
         State('expocode', 'value')
     ]
 )
-def update_map(map_in_variable, in_regions, in_woce_water, in_start_date, in_end_date, in_investigator, in_org, in_qc_flag, in_platform_type, map_info, map_in_expocode):
-
+def update_map(map_in_variable, in_regions, in_woce_water, in_start_date, in_end_date, in_investigator, in_org, in_qc_flag, in_platform_type, map_info,
+               jan_sw, feb_sw, mar_sw, apr_sw, may_sw, jun_sw, jul_sw, aug_sw, sep_sw, oct_sw, nov_sw, dec_sw,
+               map_in_expocode
+):
     vars_to_get = ['latitude','longitude','time','expocode']
+    season_months = [jan_sw, feb_sw, mar_sw, apr_sw, may_sw, jun_sw, jul_sw, aug_sw, sep_sw, oct_sw, nov_sw, dec_sw]
+    selected_months = list(compress(months, season_months))
+    month_con = util.make_con('tmonth', selected_months)
+    if month_con:
+        vars_to_get.append('tmonth')
     if map_in_variable not in vars_to_get:
         vars_to_get.append(map_in_variable)
     time_con = '&time>='+in_start_date+'&time<='+in_end_date
@@ -608,7 +877,7 @@ def update_map(map_in_variable, in_regions, in_woce_water, in_start_date, in_end
     region_con = util.make_con('region_id', in_regions)
     if region_con:
         vars_to_get.append('region_id')
-    url = decimated_url + '.csv?' + ','.join(vars_to_get) + time_con + region_con + woce_water_con + investigator_con + org_con + qc_flag_con + platform_type_con
+    url = decimated_url + '.csv?' + ','.join(vars_to_get) + time_con + region_con + woce_water_con + investigator_con + org_con + qc_flag_con + platform_type_con + month_con
     if map_info is not None and len(map_info) > 3:
         bounds = json.loads(map_info)
         cons = maputil.get_socat_subset(bounds['ll']['longitude'], bounds['ur']['longitude'],bounds['ll']['latitude'],bounds['ur']['latitude'])
@@ -744,7 +1013,7 @@ def show_selected_points(in_points):
                 columnDefs.append(
                     {
                         "field": i, "headerName": i, 'editable': True, 'sortable': True, 'cellEditor': 'agSelectCellEditor', "tooltipComponent": "CustomTooltip",
-                        'cellEditorParams': {'values': ['2', '3', '4']},"tooltipField": i, 'tooltipShowDelay': 0
+                        'cellEditorParams': {'values': ['2', '3', '4']},"tooltipField": i, 'tooltipShowDelay': 0, 
                     }
                 )
             elif 'time' in i:
@@ -867,7 +1136,54 @@ def set_visibility_plot(plot_data, in_expocode):
     else:
         return [visible,]
 
-    
+
+@app.callback(
+    [
+        Output('cruise-qc-table', 'opened', allow_duplicate=True),
+        Output('cruise-qc-grid', 'rowData', allow_duplicate=True),
+        Output('cruise-qc-grid', 'columnDefs', allow_duplicate=True)
+    ],
+    [
+        Input('table-of-cruises', 'cellClicked')
+    ], prevent_initial_call=True
+)
+def show_cruise_qc(cell):
+    if cell['colId'] == 'CruiseQC':
+        state_expo = cell['value']
+        print('in state expocode: ' + str(state_expo))
+        df = db.get_cruise_qc(state_expo)
+        columnDefs = []   
+        for i in sorted(df.columns, key=str.casefold):
+            columnDefs.append({"field": i, "headerName": i})
+        return [True, df.to_dict("records"), columnDefs]
+    else:
+        return no_update
+
+
+@app.callback(
+    [
+        Output('cruise-qc-table', 'opened', allow_duplicate=True),
+        Output('cruise-qc-grid', 'rowData', allow_duplicate=True),
+        Output('cruise-qc-grid', 'columnDefs', allow_duplicate=True)
+    ],
+    [
+        Input('cruise-qc-button', 'n_clicks')
+    ], 
+    [
+        State('expocode', 'value')
+    ],prevent_initial_call=True
+)
+def show_cruise_qc(click, state_expo):
+    if state_expo is not None and len(state_expo) > 0:
+        print('in state expocode: ' + str(state_expo))
+        df = db.get_cruise_qc(state_expo[0])
+        columnDefs = []   
+        for i in sorted(df.columns, key=str.casefold):
+            columnDefs.append({"field": i, "headerName": i})
+        return [True, df.to_dict("records"), columnDefs]
+    else:
+        return no_update
+
 
 @app.callback(
     [
@@ -1016,6 +1332,7 @@ def update_plots(plot_data_store, in_plot_type, in_prop_prop_x, in_prop_prop_y, 
 
         figure.update_layout(height=num_rows*450, margin=dict( l=80, r=80, b=80, t=80, ))
     # DEBUG print('returning figure and title')
+    print(figure)
     return[figure, card_title]
 
 
@@ -1035,6 +1352,8 @@ def set_expo_from_table_click(cell):
         return [[cell['value']],'prop-prop', False]
     elif cell['colId'] == 'thumbnails':
         return [[cell['value']],'prop-prop-thumbs', False]
+    elif cell['colId'] == 'CruiseQC':
+        return [[cell['value']],'prop-prop', False]
     else:
         raise exceptions.PreventUpdate
 
@@ -1086,9 +1405,10 @@ def make_table_of_crusies(da_click, mt_in_start_date, mt_in_end_date, mt_in_woce
     df = pd.read_csv(url, skiprows=[1])
     df['thumbnails'] = df.loc[:, 'expocode']
     df['documentation'] = 'https://data.pmel.noaa.gov/socat/las/MetadataDocsV2023/' + df.expocode.str.slice(start=0, stop=4) + '/' +  df.expocode + '/'
+    df['CruiseQC'] = df.loc[:, 'expocode']
     columnDefs = []   
     for i in sorted(df.columns, key=str.casefold):
-        if i == 'expocode' or i == 'thumbnails':
+        if i == 'expocode' or i == 'thumbnails' or i == 'CruiseQC':
             columnDefs.append({"field": i, "headerName": i, 'cellStyle': {'color': 'blue', 'text-decoration': 'underline'}})
         elif i == 'documentation':
             columnDefs.append({"field": i, "headerName": i, 'cellRenderer': "DocLink", 'cellStyle': {'color': 'blue', 'text-decoration': 'underline'}})
