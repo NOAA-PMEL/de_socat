@@ -692,7 +692,9 @@ def modal_open_edit(in_selected_data, save_button, cancel_button, rowData, opene
                 return no_update, ex_reminder
             else:
                 return no_update, reminder
-        selected_data = pd.read_json(redis_instance.hget("cache","edit-table-data"))
+        selected_data_string = redis_instance.hget("cache","edit-table-data").decode('utf-8')
+        selected_data_json = json.loads(selected_data_string)
+        selected_data = pd.read_json(selected_data_json)
         as_edited = pd.DataFrame(rowData)
         edits = pd.concat([selected_data, as_edited]).drop_duplicates(keep=False)
         start = int(edits.shape[0]/2)
@@ -782,7 +784,7 @@ def update_trace(trace_in_expocode, trace_in_variable):
         vars_to_get = list(set(vars_to_get))
         url = full_url + '.csv?' + ','.join(vars_to_get) +'&'+expo_con['con']
         # if there is an expo set, use the list previously set
-        expo_store = redis_instance.hget("cache", "expocodes")
+        expo_store = redis_instance.hget("cache", "expocodes").decode('utf-8')
         expo_options = json.loads(expo_store)
     else:
         raise exceptions.PreventUpdate
@@ -809,7 +811,7 @@ def update_trace(trace_in_expocode, trace_in_variable):
     figure.update_geos(showland=True, coastlinecolor='black', coastlinewidth=1, landcolor='tan', resolution=50)
     figure.update_coloraxes(colorbar={'orientation':'h', 'thickness':20, 'y': -.175, 'title': None})
     title = 'All ' + trace_in_variable + ' data from crusies ' + str(trace_in_expocode)
-    redis_instance.hset("cache", 'plot-data', df.to_json())
+    redis_instance.hset("cache", 'plot-data', json.dumps(df.to_json()))
     return [figure, title, 'yes', table_url, False, url, False, netcdf_url, False]
 
 @app.callback(
@@ -893,7 +895,7 @@ def update_map(map_in_variable, in_regions, in_woce_water, in_start_date, in_end
         figure.update_layout(title='Query returned no results.')
         return [figure, 'No matching data found.', []]  
     if map_in_expocode is not None and len(map_in_expocode) > 0:
-        expo_store = redis_instance.hget("cache", "expocodes")
+        expo_store = redis_instance.hget("cache", "expocodes").decode('utf-8')
         expo_options = json.loads(expo_store)
 
     if len(expo_options) == 0:
@@ -1003,7 +1005,9 @@ def get_map_ranges(df):
 )
 def show_selected_points(in_points):
     if in_points is not None:
-        all_data = pd.read_json(redis_instance.hget("cache","plot-data"))
+        all_data_string = redis_instance.hget("cache","plot-data").decode('utf-8')
+        all_data_json = json.loads(all_data_string)
+        all_data = pd.read_json(all_data_json)
         column_names = sorted(all_data.columns, key=str.casefold)
         column_names.remove('WOCE_CO2_water')
         column_names.insert(0, 'WOCE_CO2_water')
@@ -1026,7 +1030,7 @@ def show_selected_points(in_points):
             customs = point['customdata']
             times.append(customs[0])
         to_show = all_data.loc[all_data['time'].isin(times)]
-        redis_instance.hset("cache", 'edit-table-data', to_show.to_json())
+        redis_instance.hset("cache", 'edit-table-data', json.dumps(to_show.to_json()))
         return [to_show.to_dict("records"), columnDefs]
     else:
         raise exceptions.PreventUpdate
@@ -1219,7 +1223,9 @@ def update_plots(plot_data_store, in_plot_type, in_prop_prop_x, in_prop_prop_y, 
         # DEBUG print('no new data')
         raise exceptions.PreventUpdate
     
-    to_plot = pd.read_json(redis_instance.hget("cache","plot-data"))
+    to_plot_string = redis_instance.hget("cache","plot-data").decode('utf-8')
+    to_plot_json = json.loads(to_plot_string)
+    to_plot = pd.read_json(to_plot_json)
 
     if to_plot.shape[0] < 1:
         raise exceptions.PreventUpdate
@@ -1332,7 +1338,7 @@ def update_plots(plot_data_store, in_plot_type, in_prop_prop_x, in_prop_prop_y, 
 
         figure.update_layout(height=num_rows*450, margin=dict( l=80, r=80, b=80, t=80, ))
     # DEBUG print('returning figure and title')
-    print(figure)
+    # DEBUG print(figure)
     return[figure, card_title]
 
 
