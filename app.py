@@ -27,6 +27,7 @@ import dash_ag_grid as dag
 from sdig.erddap.info import Info
 import db
 from itertools import compress
+import urllib
 
 
 from sqlalchemy import create_engine
@@ -127,23 +128,25 @@ map_width = 1050
 agg_x = 270
 agg_y = 135
 
-map_title_base = 'Trajectory from the SOCAT v2022 Decimated Data Set '
-decimated_url = 'https://data.pmel.noaa.gov/socat/erddap/tabledap/socat_v2020_decimated'
-full_url = 'https://data.pmel.noaa.gov/socat/erddap/tabledap/socat_v2022_fulldata'
+map_title_base = 'Trajectory from the latest SOCAT Decimated Data Set '
+decimated_url = 'http://hazy.pmel.noaa.gov:8140/erddap/tabledap/socat_latest_decimated'
+full_url = 'http://hazy.pmel.noaa.gov:8140/erddap/tabledap/socat_latest_fulldata'
 
 # Define Dash application structure
 app = Dash(__name__)
 server = app.server  # expose server variable for Procfile
 
 months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-
+print('starting info query')
 dinfo = Info(decimated_url)
 variables, long_names, standard_name, units, v_d_types = dinfo.get_variables()
 variable_options = []
 for var in variables:   
     if var != 'lat_meters' and var != 'lon_meters':
         variable_options.append({'label':var, 'value': var})
+print('finished info meta')
 start_date, end_date, start_seconds, end_seconds = dinfo.get_times()
+print('finished info times')
 
 app.layout = dmc.Container(fluid=True, children=[
     dmc.Header(height=90, children=[
@@ -252,8 +255,11 @@ app.layout = dmc.Container(fluid=True, children=[
                                         {'label': 'B', 'value': 'B'},
                                         {'label': 'C', 'value': 'C'},
                                         {'label': 'D', 'value': 'D'},
-                                        {'label': 'E', 'value': 'E'}
-                                    ]),                                
+                                        {'label': 'E', 'value': 'E'},
+                                        {'label': 'Q', 'value': 'Q'},
+                                        {'label': 'U', 'value': 'U'},
+                                        {'label': 'N', 'value': 'N'},
+                                    ], value=["Q", "U", "N"]),                                
                                 ])
                             ]),
                             dmc.AccordionItem(value='platform-type-item', children=[
@@ -615,15 +621,15 @@ def modal_open_debug(show_button, delete_button, opened):
     return [not opened, edited_rows.to_dict("records"), columnDefs]
 
 
-@app.callback(
-    Output("modal-cruise-flags", "opened", allow_duplicate=True),
-    Input('add-cruise-qc', 'n_clicks'),
-    State("modal-edit-table", "opened"),
-    # Verify, but I think the expocode has been set in the menu State()
-    prevent_initial_call=True,
-)
-def modal_open_debug(show_button, opened):
-    return [not opened]
+# @app.callback(
+#     Output("modal-cruise-flags", "opened", allow_duplicate=True),
+#     Input('add-cruise-qc', 'n_clicks'),
+#     State("modal-edit-table", "opened"),
+#     # Verify, but I think the expocode has been set in the menu State()
+#     prevent_initial_call=True,
+# )
+# def modal_open_debug(show_button, opened):
+#     return [not opened]
 
 
 @app.callback(
@@ -860,7 +866,7 @@ def update_map(map_in_variable, in_regions, in_woce_water, in_start_date, in_end
         vars_to_get.append('tmonth')
     if map_in_variable not in vars_to_get:
         vars_to_get.append(map_in_variable)
-    time_con = '&time>='+in_start_date+'&time<='+in_end_date
+    time_con = '&time>='+urllib.parse.quote(in_start_date)+'&time<='+urllib.parse.quote(in_end_date)
     investigator_con = util.make_con('investigators', in_investigator)
     if investigator_con:
         vars_to_get.append('investigators')
@@ -888,7 +894,8 @@ def update_map(map_in_variable, in_regions, in_woce_water, in_start_date, in_end
     print('Map URL: ' + url)
     try:
         df = pd.read_csv(url, skiprows=[1])
-    except:
+    except Exception as e:
+        print(e)
         figure = go.Figure(go.Scattergeo())
         figure.update_layout(margin={'t':25, 'b':25, 'l':0, 'r':0})
         figure.update_geos(showland=True, coastlinecolor='black', coastlinewidth=1, landcolor='tan', resolution=50)
@@ -1163,30 +1170,6 @@ def show_cruise_qc(cell):
     else:
         return no_update
 
-
-@app.callback(
-    [
-        Output('cruise-qc-table', 'opened', allow_duplicate=True),
-        Output('cruise-qc-grid', 'rowData', allow_duplicate=True),
-        Output('cruise-qc-grid', 'columnDefs', allow_duplicate=True)
-    ],
-    [
-        Input('cruise-qc-button', 'n_clicks')
-    ], 
-    [
-        State('expocode', 'value')
-    ],prevent_initial_call=True
-)
-def show_cruise_qc(click, state_expo):
-    if state_expo is not None and len(state_expo) > 0:
-        print('in state expocode: ' + str(state_expo))
-        df = db.get_cruise_qc(state_expo[0])
-        columnDefs = []   
-        for i in sorted(df.columns, key=str.casefold):
-            columnDefs.append({"field": i, "headerName": i})
-        return [True, df.to_dict("records"), columnDefs]
-    else:
-        return no_update
 
 
 @app.callback(
