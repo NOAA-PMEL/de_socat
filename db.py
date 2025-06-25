@@ -1,5 +1,5 @@
 import pandas as pd
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.pool import NullPool
 import pymysql
 import os
@@ -61,6 +61,21 @@ def get_cruise_qc(expocode):
         print(qc_query)
         qc_records = pd.read_sql(qc_query, connection)
         return qc_records
+
+
+
+def save_qc_event(flag_value, flag_date, expocode, socat_version, region_id, reviewer, comment):
+
+    insert_qc = f"""
+        INSERT INTO QCEvents (`qc_flag`, `qc_time`, `expocode`, `socat_version`, `region_id`, `reviewer_id`, `qc_comment`)
+        VALUES({flag_value}, {flag_date}, {expocode}, {socat_version}, {region_id}, {reviewer}, {comment});
+    """
+    # with mysql_engine.connect() as connection:
+    #     connection.execute(text(insert_qc))
+    #     connection.commit()
+
+    return insert_qc
+
 
 
 # Create a SQLAlchemy engine object. This object initiates a connection pool
