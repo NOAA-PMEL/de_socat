@@ -583,7 +583,7 @@ app.layout = ddk.App(show_editor=True, theme=theme, children=[
                                             {'label': 'F', 'value': 'F'},
                                             {'label': 'Suspend', 'value': 'suspend'},
                                             {'label': 'Exclude', 'value': 'Exclude'},
-                                        ], value='comment', style={'width': '120px'})
+                                        ], value='comment', style={'width': '120px'}, multi=False)
                                     ]),
                                     ddk.ControlItem(label='Additional Comment', children=[
                                         dcc.Textarea(id='qc-additional-comment', rows=10, cols=80)
@@ -872,12 +872,12 @@ def show_and_save_comments(click, qc_region_value, flag_value, fco2, sop, meta, 
     df_json_string = redis_instance.hget('cache', 'table-of-cruises').decode('utf-8')
     df = pd.read_json(StringIO(json.loads(df_json_string)))
     row = df.loc[df['expocode']==expocode]
-    socat_version = row['socat_version'].astype(str)
+    socat_version = str(row['socat_version'])
     # TODO we need to know who is logged in
     # Actually save the stuff instead of returning a query string
-    # query = db.save_qc_event(flag_value, datetime.now().isoformat(), expocode, socat_version, qc_region_value, "FAKE_REVIEWER", full_comment)
-    df = pd.DataFrame({'qc_flag': flag_value, 'qc_time': datetime.now(timezone.utc).isoformat(), 'expocode': expocode, 'socat_version': socat_version, 'region_id': qc_region_value, 'reviewer_id': 'FAKE REVIEWER', 'qc_comment': full_comment})
-    df.to_sql(qc_entries_table, postgres_engine, if_exists='append', index=False)
+    frame_input = {'qc_flag': flag_value, 'qc_time': datetime.now(timezone.utc).isoformat(), 'expocode': expocode, 'socat_version': socat_version, 'region_id': qc_region_value, 'reviewer_id': 'FAKE REVIEWER', 'qc_comment': full_comment}
+    df = pd.DataFrame(frame_input)
+    df.to_sql(constants.qc_entries_table, postgres_engine, if_exists='append', index=False)
     return [full_comment, {'visibility':'visible'}, False]
 
 
