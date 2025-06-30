@@ -1,5 +1,8 @@
 from theme import theme
 
+edits_table = 'socat_edits'
+qc_entries_table = 'qc_entries'
+
 regions = {
     "A": {
         'll': {
