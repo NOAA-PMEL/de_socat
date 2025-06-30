@@ -225,7 +225,7 @@ variables, long_names, standard_name, units, v_d_types = dinfo.get_variables()
 variable_options = []
 for var in variables:   
     if var != 'lat_meters' and var != 'lon_meters':
-        variable_options.append({'label':long_names[var], 'value': var})
+        variable_options.append({'label':var, 'value': var})
 # DEBUG print('finished info meta')
 start_date, end_date, start_seconds, end_seconds = dinfo.get_times()
 # DEBUG print('finished info times')
