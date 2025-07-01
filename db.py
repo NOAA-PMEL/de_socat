@@ -1,10 +1,11 @@
 import pandas as pd
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.pool import NullPool
 import pymysql
 import os
 
-edits_table = 'socat_edits'
+import constants
+
 
 # Create a SQLAlchemy connection string from the environment variable `DATABASE_URL`
 # automatically created in your dash app when it is linked to a postgres container
@@ -63,6 +64,21 @@ def get_cruise_qc(expocode):
         return qc_records
 
 
+
+# def save_qc_event(flag_value, flag_date, expocode, socat_version, region_id, reviewer, comment):
+
+    # insert_qc = f"""
+    #     INSERT INTO QCEvents (`qc_flag`, `qc_time`, `expocode`, `socat_version`, `region_id`, `reviewer_id`, `qc_comment`)
+    #     VALUES({flag_value}, {flag_date}, {expocode}, {socat_version}, {region_id}, {reviewer}, {comment});
+    # """
+    # with mysql_engine.connect() as connection:
+    #     connection.execute(text(insert_qc))
+    #     connection.commit()
+
+    # return insert_qc
+
+
+
 # Create a SQLAlchemy engine object. This object initiates a connection pool
 # so we create it once here and import into app.py.
 # `poolclass=NullPool` prevents the Engine from using any connection more than once. You'll find more info here:
@@ -71,16 +87,23 @@ postgres_engine = create_engine(connection_string, poolclass=NullPool)
 
 def show_saves():
     updated_df = pd.read_sql(
-        "SELECT * FROM {};".format(edits_table), postgres_engine
+        "SELECT * FROM {};".format(constants.edits_table), postgres_engine
     )
     return updated_df
 
 
+def show_qc():
+    new_qc = pd.read_sql(
+        f"SELECT * from {constants.qc_entries_table}", postgres_engine
+    )
+    return new_qc
+
+
 def delete_all_rows():
     delete = 'DELETE FROM {};'
-    postgres_engine.execute(delete.format(edits_table))
+    postgres_engine.execute(delete.format(constants.edits_table))
 
 
 def drop_edits():
     delete = 'DROP TABLE {};'
-    postgres_engine.execute(delete.format(edits_table))
+    postgres_engine.execute(delete.format(constants.edits_table))
