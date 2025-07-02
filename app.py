@@ -596,7 +596,35 @@ app.layout = ddk.App(show_editor=True, theme=theme, children=[
         ])
     ]),
     
-    ddk.Footer(children=[html.P("This is the footer!", style={"color":"white"})]),
+    ddk.Footer(children=[
+        html.Hr(),
+            ddk.Block(children=[
+                ddk.Block(width=.3, children=[
+                    html.Div(children=[
+                        dcc.Link('National Oceanic and Atmospheric Administration',
+                                href='https://www.noaa.gov/', style={'font-size': '.8em'}),
+                    ]),
+                    html.Div(children=[
+                        dcc.Link('Pacific Marine Environmental Laboratory',
+                                href='https://www.pmel.noaa.gov/',style={'font-size': '.8em'}),
+                    ]),
+                    html.Div(children=[
+                        dcc.Link('oar.pmel.webmaster@noaa.gov', href='mailto:oar.pmel.webmaster@noaa.gov', style={'font-size': '.8em'})
+                    ]),
+                    dcc.Link('DOC |', href='https://www.commerce.gov/', style={'font-size': '.8em'}),
+                    dcc.Link(' NOAA |', href='https://www.noaa.gov/', style={'font-size': '.8em'}),
+                    dcc.Link(' OAR |', href='https://www.research.noaa.gov/', style={'font-size': '.8em'}),
+                    dcc.Link(' PMEL |', href='https://www.pmel.noaa.gov/', style={'font-size': '.8em'}),
+                    dcc.Link(' Privacy Policy |', href='https://www.noaa.gov/disclaimer', style={'font-size': '.8em'}),
+                    dcc.Link(' Disclaimer |', href='https://www.noaa.gov/disclaimer',style={'font-size': '.8em'}),
+                    dcc.Link(' Accessibility', href='https://www.pmel.noaa.gov/accessibility',style={'font-size': '.8em'})
+                ]),
+                ddk.Block(width=.7,children=[html.Img(src=app.get_asset_url('logo-PMEL-lockup-light_noaaPMEL_horizontal_rgb-txt_2024.png'), style={'height': '90px', 'padding':'14px'})])
+            ])
+        ], 
+        style={"color":"white"}
+    )
+
 ])
 
 
