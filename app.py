@@ -194,13 +194,8 @@ full_url = 'https://data.pmel.noaa.gov/socat/erddap/tabledap/socat_v2025_fulldat
 edf = pd.read_sql('SELECT * from cruises', con=postgres_engine)
 expos = sorted(list(edf['expocode']))
 initial_expo_options = []
-if '69920180814' in expos:
-    print('Found 69920180814')
-else:
-    print('expo does not exist')
+
 for code in expos:
-    if '69920180814' in code:
-        print(f'Adding -----{code}-----')
     initial_expo_options.append({'label':code, 'value':code})
 initial_expo_value = [expos[0]]
 
@@ -374,7 +369,7 @@ app.layout = ddk.App(show_editor=True, theme=theme, children=[
             dcc.Tabs(id="selected-cruises-tabs", value='table-sub-tab', style=tabs_styles, children=[
                 dcc.Tab(id='table-sub-tab', label='Table of Selected Cruises', value='table-sub-tab', style=tab_style, selected_style=tab_selected_style, children=[
                     ddk.Card(children=[
-                        ddk.CardHeader(fullscreen=True),
+                        # ddk.CardHeader(fullscreen=True),
                         dcc.Loading(children=[
                             dag.AgGrid(id='table-of-cruises', dashGridOptions={'pagination':True, "paginationAutoPageSize": True}, 
                                                 columnSize="sizeToFit",
@@ -461,7 +456,7 @@ app.layout = ddk.App(show_editor=True, theme=theme, children=[
                                         
                                     ]),
                                     ddk.Card(style={'position': 'absolute', 'bottom': 0}, children=[
-                                        dag.AgGrid(id='selected-points', style={'height': '60vh'})
+                                        dag.AgGrid(id='selected-points', style={'height': '60vh'}, dashGridOptions={"rowSelection": "multiple", "suppressRowClickSelection": True})
                                     ]) 
                             ]),
                             ddk.ControlItem(label='X-axis', children=[
@@ -1236,14 +1231,22 @@ def show_selected_points(click, in_points):
         column_names.remove('WOCE_CO2_atm')
         column_names.insert(1, 'WOCE_CO2_atm')
         columnDefs = []
-        for i in column_names:
+        for idx, i in enumerate(column_names):
             if 'WOCE' in i:
-                columnDefs.append(
-                    {
-                        "field": i, "headerName": i, 'editable': True, 'sortable': True, 'cellEditor': 'agSelectCellEditor', "tooltipComponent": "CustomTooltip",
-                        'cellEditorParams': {'values': [2, 3, 4]},"tooltipField": i, 'tooltipShowDelay': 0, 
-                    }
-                )
+                if idx == 0:
+                    columnDefs.append(
+                        {
+                            "field": i, "headerName": i, 'editable': True, 'sortable': True, 'cellEditor': 'agSelectCellEditor', "tooltipComponent": "CustomTooltip",
+                            'cellEditorParams': {'values': [2, 3, 4]},"tooltipField": i, 'tooltipShowDelay': 0, "checkboxSelection": True, "headerCheckboxSelection": True,
+                        }
+                    )
+                else:
+                    columnDefs.append(
+                        {
+                            "field": i, "headerName": i, 'editable': True, 'sortable': True, 'cellEditor': 'agSelectCellEditor', "tooltipComponent": "CustomTooltip",
+                            'cellEditorParams': {'values': [2, 3, 4]},"tooltipField": i, 'tooltipShowDelay': 0, 
+                        }
+                    )
             elif 'time' in i:
                 columnDefs.append({"field": i, "headerName": i, 'sortable': True})
             else:
@@ -1540,8 +1543,9 @@ def make_thumbnails(plot_data_store, plot_in_expocode,):
     ], prevent_initial_call=True
 )
 def set_expo_from_table_click(cell):
-    # DEBUG print(f"clicked on cell value:  {cell['value']}, column:   {cell['colId']}, row index:   {cell['rowIndex']}")
-    if cell['colId'] == 'expocode':
+    # DEBUG 
+    print(f"clicked on cell value:  {cell['value']}, column:   {cell['colId']}, row index:   {cell['rowIndex']}")
+    if cell['colId'] == 'prop':
         return [cell['value'], 'plots', 'prop-prop-plot',]
     elif cell['colId'] == 'thumbnails':
         return [cell['value'], 'plots', 'prop-prop-thumbs',]
@@ -1611,14 +1615,25 @@ def make_table_of_crusies(da_click, mt_in_expocodes, mt_in_start_date, mt_in_end
         df['thumbnails'] = df.loc[:, 'expocode']
         df['documentation'] = 'https://data.pmel.noaa.gov/socat/las/MetadataDocsV2023/' + df.expocode.str.slice(start=0, stop=4) + '/' +  df.expocode + '/'
         df['CruiseQC'] = df.loc[:, 'expocode']
-    columnDefs = []   
-    for i in sorted(df.columns, key=str.casefold):
-        if i == 'expocode' or i == 'thumbnails' or i == 'CruiseQC':
-            columnDefs.append({"field": i, "headerName": i, 'cellStyle': {'color': 'blue', 'text-decoration': 'underline'}})
-        elif i == 'documentation':
-            columnDefs.append({"field": i, "headerName": i, 'cellRenderer': "DocLink", 'cellStyle': {'color': 'blue', 'text-decoration': 'underline'}})
-        else:
-            columnDefs.append({"field": i, "headerName": i})
+        df['prop'] = df.loc[:, 'expocode']
+        df['links'] = df.loc[:, 'expocode']
+
+    table_of_cruises_columnDefs = [
+        {'field': 'expocode', 'headerName': 'Expocode'},
+        {"field": 'links', "headerName": 'Actions',
+            "children": [
+                    {"field": "documentation", 'headerName': 'Documentation', 'cellRenderer': "DocLink", 'cellStyle': {'color': 'blue', 'text-decoration': 'underline'}},
+                    {"field": "prop", 'headerName': 'Prop-prop plot', 'cellRenderer': 'myButtonCellRenderer', "autoHeight": True},
+                    {"field": "thumbnails", 'headerName': 'Thumbnails', 'cellRenderer': 'myButtonCellRenderer', "autoHeight": True},
+                    {"field": "CruiseQC", 'headerName': 'CruiseQC', 'cellRenderer': 'myButtonCellRenderer', "autoHeight": True},
+                ]
+        },
+        {'field':'investigators', 'headerName': 'Investigators'},
+        {'field': 'platform_name', 'headerName': 'Platform Name'},
+        {'field': 'qc_flag', 'headerName': 'QC Flag'},
+        {'field': 'socat_version', 'headerName': 'SOCAT Version'}
+    ]  
+
     expos = sorted(list(df['expocode']))
     for code in expos:
         expo_options.append({'label': code, 'value': code})
@@ -1626,7 +1641,7 @@ def make_table_of_crusies(da_click, mt_in_expocodes, mt_in_start_date, mt_in_end
     # Cache the table so we can extract the version number when/if we go to save a QC entry
     # and so we can make a map from the locations database
     redis_instance.hset('cache', 'table-of-cruises', json.dumps(df.to_json()))
-    return [df.to_dict("records"), columnDefs, expo_options, expo_value, 'go', '']
+    return [df.to_dict("records"), table_of_cruises_columnDefs, expo_options, expo_value, 'go', '']
 
 
 @app.callback(

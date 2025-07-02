@@ -165,15 +165,57 @@ theme = {
     }
 }
 
+
+# The background colors are getting over-ridden by the Design Kit theme, so they are essentially being ignored which is Ok
+# I suppose since having the theme work is more important.
+# The border setting work so we get the desired rounded corners and the gutters in between the tabs.
+
+
+tab_style = {
+    'border-top-left-radius': '8px',   # Rounded top-left corner
+    'border-top-right-radius': '8px',  # Rounded top-right corner
+    'border-top': '2px solid #d6d6d6',     # Light gray outline for top sides
+    'border-left': '2px solid #d6d6d6',     # Light gray outline for left sides
+    'border-right': '2px solid #d6d6d6',     # Light gray outline for right sides
+    'border-bottom': 'none',           # Remove the bottom border
+    'background-color': '#f9f9f9',     # Very light gray background
+    'padding': '10px 15px',            # Padding (top/bottom, left/right)
+    'margin-right': '5px',             # Space between tabs to the right
+    'color': '#555',                   # Darker text color
+    'font-weight': 'normal',           # Normal font weight
+    'cursor': 'pointer',               # Indicate it's clickable
+    'transition': 'all 0.3s ease-in-out', # Smooth transitions
+    'position': 'relative',            # Needed for z-index if using it
+    'z-index': '1'                     # Ensure unselected tabs are below selected if they overlap
+}
+
+tab_selected_style = {
+    'border-top-left-radius': '8px',   # Rounded top-left corner
+    'border-top-right-radius': '8px',  # Rounded top-right corner
+    'border-left': '2px solid #007bff',     # Distinct blue outline (thicker)
+    'border-right': '2px solid #007bff',     # Distinct blue outline (thicker)
+    'border-top': '2px solid #007bff',     # Distinct blue outline (thicker)
+    'border-bottom': 'none',           # Remove the bottom border
+    'background-color': '#ffffff',     # White background for the selected tab (to stand out)
+    'padding': '10px 15px',
+    'margin-right': '5px',
+    'color': '#007bff',                # Blue text color
+    'font-weight': 'bold',             # Bold text for selected tab
+    'cursor': 'default',               # No pointer cursor when selected
+    'transition': 'all 0.3s ease-in-out',
+    'position': 'relative',
+    'z-index': '10'                    # Ensure the selected tab is on top
+}
+
 tabs_styles = {
     'height': '44px'
 }
 
-tab_style = {
+old_tab_style = {
     'padding': '6px',
 }
 
-tab_selected_style = {
+old_tab_selected_style = {
     'fontWeight': 'bold',
     'padding': '6px'
 }

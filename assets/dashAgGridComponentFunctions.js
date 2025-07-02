@@ -20,5 +20,32 @@ dagcomponentfuncs.DocLink = function (props) {
     {
         target: '_blank',
         href: props.value
-    }, 'Documentation');
+    }, 'Open!');
 };
+
+// buttonCellRenderer.js
+// This JavaScript function will be used as a cell renderer in Dash AG Grid.
+// It takes the cell's parameters (params) as input and returns an HTML element
+// containing four styled buttons.
+
+dagcomponentfuncs.myButtonCellRenderer = function(props) {
+        const {setData, data} = props;
+    
+        function onClick() {
+            setData();
+        }
+        const myStyles = {
+            height: '30px',
+            marginTop: '3px',
+            marginBottom: '6px'
+        };
+        return React.createElement(
+            'button',
+            {
+                onClick: onClick,
+                className: props.className,
+                style: myStyles
+            },
+            'Go!'
+        );
+    };
