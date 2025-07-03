@@ -448,15 +448,26 @@ app.layout = ddk.App(show_editor=True, theme=theme, children=[
                             ]),
                             ddk.Block(width=1, id='selected-points-card', style={'height': '85vh', 'width': '85vw'}, children=[
                                 
-                                    ddk.ControlCard(width=1, style={'height': '20vh'}, orientation='h', children=[
+                                    ddk.ControlCard(width=1, style={'height': '35vh'}, orientation='h', children=[
                                         ddk.CardHeader(title='Set WOCE Flags'),
-                                        ddk.ControlItem(children=[html.H6("Double click the WOCE Flag cell you want to change. When the menu appears, select the value you want to assign.")]),
+                                        ddk.ControlItem(width=.3, label='Set WOCE_CO2_water Checked Rows:', children=[
+                                            html.Button('Set', id='set-woce-water', style={'width': '95px'}),
+                                            dcc.Dropdown(id='qc-woce-co2-water', placeholder='Pick a Flag Value',
+                                                multi=False, style={'width': '200px' },
+                                                options=[
+                                                    {'value': "2", "label": '2'},
+                                                    {'value': "3", "label": "3"},
+                                                    {'value': "4", "label": '4'},
+                                                ]
+                                            )
+                                        ]),
+                                        # ddk.ControlItem(children=[html.H6("Double click the WOCE Flag cell you want to change. When the menu appears, select the value you want to assign.")]),
                                         ddk.ControlItem(label="Save Flags", children=[html.Button(id='save-woce-flags', children='Save Flags')]),
-                                        ddk.ControlItem(label='Comment', children=[dcc.Textarea(id='comment', rows=3, cols=85)]),
+                                        ddk.ControlItem(label='Comment', children=[dcc.Textarea(id='comment', rows=4, cols=65)]),
                                         
                                     ]),
                                     ddk.Card(style={'position': 'absolute', 'bottom': 0}, children=[
-                                        dag.AgGrid(id='selected-points', style={'height': '60vh'}, dashGridOptions={"rowSelection": "multiple", "suppressRowClickSelection": True})
+                                        dag.AgGrid(id='selected-points', style={'height': '55vh'}, dashGridOptions={"rowSelection": "multiple", "suppressRowClickSelection": True})
                                     ]) 
                             ]),
                             ddk.ControlItem(label='X-axis', children=[
@@ -626,6 +637,35 @@ app.layout = ddk.App(show_editor=True, theme=theme, children=[
     )
 
 ])
+
+
+@app.callback(
+    [
+        Output('selected-points', 'rowData', allow_duplicate=True),
+        Output('selected-points', 'selectedRows')
+    ],
+    [
+        Input('set-woce-water', 'n_clicks')
+    ],
+    [
+        State('selected-points', 'rowData'),
+        State('selected-points', 'selectedRows'),
+        State('qc-woce-co2-water', 'value')
+    ], prevent_initial_call = True
+)
+def apply_woce_water(click, row_data, selected_rows, woce_flag):
+    if row_data is None or len(row_data) < 1:
+        return no_update
+    if woce_flag is None or len(woce_flag) < 1:
+        return no_update
+    if selected_rows is None or len(selected_rows) < 1:
+        return no_update
+    for srow in selected_rows:
+        time = srow['time']
+        for row in row_data:
+            if row['time'] == time:
+                row['WOCE_CO2_water'] = int(woce_flag)
+    return row_data, []
 
 
 @app.callback(
@@ -1403,11 +1443,11 @@ def make_property_property(plot_data_store, in_prop_prop_x, in_prop_prop_y, in_p
     if plot_in_expocode is not None and len(plot_in_expocode) > 0:
         if redis_instance.hexists('cache', str(plot_in_expocode)):
             df_json_string = redis_instance.hget('cache', plot_in_expocode).decode('utf-8')
-            df = pd.read_json(StringIO(json.loads(df_json_string)))
+            df = pd.read_json(StringIO(json.loads(df_json_string)), dtype=dtype_definitions)
         else:
             url = f'{full_url}.csv?{to_get}&expocode="{plot_in_expocode}"'            
-            df = pd.read_csv(url, skiprows=[1])
-            redis_instance.hset('cache', str(code), json.dumps(df.to_json()))
+            df = pd.read_csv(url, skiprows=[1], dtype=dtype_definitions)
+            redis_instance.hset('cache', str(code), json.dumps(df.to_json()),)
             redis_instance.hexpire('cache', 3600, code)
     else:
         return [get_blank('Select an expocode form the menu.'), no_update] 
