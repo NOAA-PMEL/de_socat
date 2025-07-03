@@ -1300,22 +1300,7 @@ def show_selected_points(click, in_points):
         column_names.insert(1, 'WOCE_CO2_atm')
         columnDefs = []
         for idx, i in enumerate(column_names):
-            if 'WOCE' in i:
-                if idx == 0:
-                    columnDefs.append(
-                        {
-                            "field": i, "headerName": i, 'editable': True, 'sortable': True, 'cellEditor': 'agSelectCellEditor', "tooltipComponent": "CustomTooltip",
-                            'cellEditorParams': {'values': [2, 3, 4]},"tooltipField": i, 'tooltipShowDelay': 0, "checkboxSelection": True, "headerCheckboxSelection": True,
-                        }
-                    )
-                else:
-                    columnDefs.append(
-                        {
-                            "field": i, "headerName": i, 'editable': True, 'sortable': True, 'cellEditor': 'agSelectCellEditor', "tooltipComponent": "CustomTooltip",
-                            'cellEditorParams': {'values': [2, 3, 4]},"tooltipField": i, 'tooltipShowDelay': 0, 
-                        }
-                    )
-            elif 'time' in i:
+            if 'time' in i:
                 columnDefs.append({"field": i, "headerName": i, 'sortable': True})
             else:
                 columnDefs.append({"field": i, "headerName": i})
