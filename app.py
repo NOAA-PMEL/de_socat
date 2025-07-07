@@ -454,7 +454,7 @@ app.layout = ddk.App(show_editor=True, theme=theme, children=[
                                 
                                     ddk.ControlCard(width=1, style={'height': '35vh'}, orientation='h', children=[
                                         ddk.CardHeader(title='Set WOCE Flags'),
-                                        ddk.ControlItem(width=.3, label='Set WOCE_CO2_water Checked Rows:', children=[
+                                        ddk.ControlItem(id='set-row-item', width=.3, label='Set WOCE_CO2_water Checked Rows:', children=[
                                             html.Button('Set', id='set-woce-flag', style={'width': '95px'}),
                                             dcc.Dropdown(id='qc-woce-co2-flag-value', placeholder='Pick a Flag Value',
                                                 multi=False, style={'width': '200px' },
@@ -953,48 +953,6 @@ def show_and_save_comments(click, qc_region_value, flag_value, fco2, sop, meta, 
     return [full_comment, {'visibility':'visible'}, False]
 
 
-# @app.callback(
-#     Output("modal-edit-table", "opened"),
-#     Output('comment', 'value'),
-#     Input('prop-prop-graph', 'selectedData'),
-#     Input('edit-save', 'n_clicks'),
-#     Input('edit-cancel', 'n_clicks'),
-#     State('selected-points', 'rowData'),
-#     State("modal-edit-table", "opened"),
-#     State('comment','value'),
-#     prevent_initial_call=True,
-# )
-# def modal_open_edit(in_selected_data, save_button, cancel_button, rowData, opened, in_comment):
-#     reminder = 'You must supply a comment.'
-#     ex_reminder = 'No, really. You must supply a comment telling what you did and why.'
-#     if in_selected_data is None: 
-#         raise exceptions.PreventUpdate
-#     if len(in_selected_data['points']) == 0:
-#         raise exceptions.PreventUpdate
-#     triggered_id = callback_context.triggered_id
-#     if triggered_id == 'edit-save':
-#         if in_comment is None or len(in_comment) == 0 or in_comment == reminder or in_comment == ex_reminder:
-#             if in_comment == reminder:
-#                 return no_update, ex_reminder
-#             else:
-#                 return no_update, reminder
-#         selected_data_string = redis_instance.hget("cache","edit-table-data").decode('utf-8')
-#         selected_data_json = json.loads(selected_data_string)
-#         selected_data = pd.read_json(selected_data_json)
-#         as_edited = pd.DataFrame(rowData)
-#         edits = pd.concat([selected_data, as_edited]).drop_duplicates(keep=False)
-#         start = int(edits.shape[0]/2)
-#         d = datetime.utcnow()
-#         d = str(d)
-#         d = d.replace(d[-7:], 'Z')
-#         edits.loc[:, 'edit_timestamp'] = d
-#         edits.loc[:, 'comment'] = in_comment
-#         save_edits = edits.iloc[start:]
-#         save_edits.to_sql(edits_table, postgres_engine, if_exists='append', index=False)
-#         save_edits.to_sql(edits_table, db.mysql_engine, if_exists='append', index=False)
-#     return not opened, ''
-
-
 @app.callback(
     [
         Output('prop-prop-x', 'options'),
@@ -1288,7 +1246,8 @@ def get_map_ranges(df):
     [
         Output('selected-points', 'rowData'),
         Output('selected-points', 'columnDefs'),
-        Output('selected-points',  'rowClassRules')
+        Output('selected-points',  'rowClassRules'),
+        Output('set-row-item', 'label')
     ],
     [
         Input('flag', 'n_clicks')
@@ -1299,10 +1258,12 @@ def get_map_ranges(df):
     ]
 )
 def show_selected_points(click, in_points, flag_to_set):
+
     if flag_to_set == 'WOCE_CO2_atm':
         row_rules = constants.atm_edit_style
     else:
         row_rules = constants.water_edit_style
+    row_item_label = f'Set {flag_to_set} Checked Rows:'
     if in_points is not None:
         all_data_string = redis_instance.hget("cache","plot-data").decode('utf-8')
         all_data_json = json.loads(all_data_string)
@@ -1343,7 +1304,7 @@ def show_selected_points(click, in_points, flag_to_set):
             times.append(customs[0])
         to_show = all_data.loc[all_data['time'].isin(times)]
         redis_instance.hset("cache", 'edit-table-data', json.dumps(to_show.to_json()))
-        return [to_show.to_dict("records"), columnDefs, row_rules]
+        return [to_show.to_dict("records"), columnDefs, row_rules, row_item_label]
     else:
         raise exceptions.PreventUpdate
 
