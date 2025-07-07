@@ -1,5 +1,17 @@
 from theme import theme
 
+water_edit_style = {
+                "green-cell": "params.data.WOCE_CO2_water == 2",
+                "yellow-cell": "params.data.WOCE_CO2_water == 3",
+                "red-cell": "params.data.WOCE_CO2_water == 4"
+            }
+
+atm_edit_style = {
+                "green-cell": "params.data.WOCE_CO2_atm == 2",
+                "yellow-cell": "params.data.WOCE_CO2_atm == 3",
+                "red-cell": "params.data.WOCE_CO2_atm == 4"
+            }
+
 edits_table = 'socat_edits'
 qc_entries_table = 'qc_entries'
 

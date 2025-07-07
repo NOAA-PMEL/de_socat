@@ -442,8 +442,12 @@ app.layout = ddk.App(show_editor=True, theme=theme, children=[
                             ddk.ControlItem(label='Flag Selected Points', children=[
                                 ddk.Block(children=[
                                     ddk.Modal(id='edit-flags-modal', target_id='selected-points-card', hide_target=True, children=[
-                                        html.Button(id='flag', children="Set Flags")
-                                    ])
+                                        html.Button(id='flag', children="Set Flags for")
+                                    ]),
+                                    dcc.Dropdown(id='woce-flag-to-set', options=[
+                                        {'label':'WOCE_CO2_water', 'value':'WOCE_CO2_water'},
+                                        {'label':'WOCE_CO2_atm', 'value': 'WOCE_CO2_atm'}
+                                    ], value='WOCE_CO2_water', clearable=False)
                                 ])
                             ]),
                             ddk.Block(width=1, id='selected-points-card', style={'height': '85vh', 'width': '85vw'}, children=[
@@ -451,8 +455,8 @@ app.layout = ddk.App(show_editor=True, theme=theme, children=[
                                     ddk.ControlCard(width=1, style={'height': '35vh'}, orientation='h', children=[
                                         ddk.CardHeader(title='Set WOCE Flags'),
                                         ddk.ControlItem(width=.3, label='Set WOCE_CO2_water Checked Rows:', children=[
-                                            html.Button('Set', id='set-woce-water', style={'width': '95px'}),
-                                            dcc.Dropdown(id='qc-woce-co2-water', placeholder='Pick a Flag Value',
+                                            html.Button('Set', id='set-woce-flag', style={'width': '95px'}),
+                                            dcc.Dropdown(id='qc-woce-co2-flag-value', placeholder='Pick a Flag Value',
                                                 multi=False, style={'width': '200px' },
                                                 options=[
                                                     {'value': "2", "label": '2'},
@@ -467,7 +471,11 @@ app.layout = ddk.App(show_editor=True, theme=theme, children=[
                                         
                                     ]),
                                     ddk.Card(style={'position': 'absolute', 'bottom': 0}, children=[
-                                        dag.AgGrid(id='selected-points', style={'height': '55vh'}, dashGridOptions={"rowSelection": "multiple", "suppressRowClickSelection": True})
+                                        dag.AgGrid(
+                                                id='selected-points', style={'height': '55vh'}, 
+                                                dashGridOptions={"rowSelection": "multiple", "suppressRowClickSelection": True,},
+                                                rowClassRules=constants.water_edit_style
+                                        )
                                     ]) 
                             ]),
                             ddk.ControlItem(label='X-axis', children=[
@@ -645,15 +653,16 @@ app.layout = ddk.App(show_editor=True, theme=theme, children=[
         Output('selected-points', 'selectedRows')
     ],
     [
-        Input('set-woce-water', 'n_clicks')
+        Input('set-woce-flag', 'n_clicks')
     ],
     [
         State('selected-points', 'rowData'),
         State('selected-points', 'selectedRows'),
-        State('qc-woce-co2-water', 'value')
+        State('qc-woce-co2-flag-value', 'value'),
+        State('woce-flag-to-set', 'value')
     ], prevent_initial_call = True
 )
-def apply_woce_water(click, row_data, selected_rows, woce_flag):
+def apply_woce_water(click, row_data, selected_rows, woce_flag, flag_to_set):
     if row_data is None or len(row_data) < 1:
         return no_update
     if woce_flag is None or len(woce_flag) < 1:
@@ -664,7 +673,7 @@ def apply_woce_water(click, row_data, selected_rows, woce_flag):
         time = srow['time']
         for row in row_data:
             if row['time'] == time:
-                row['WOCE_CO2_water'] = int(woce_flag)
+                row[flag_to_set] = int(woce_flag)
     return row_data, []
 
 
@@ -1278,16 +1287,22 @@ def get_map_ranges(df):
 @app.callback(
     [
         Output('selected-points', 'rowData'),
-        Output('selected-points', 'columnDefs')
+        Output('selected-points', 'columnDefs'),
+        Output('selected-points',  'rowClassRules')
     ],
     [
         Input('flag', 'n_clicks')
     ],
     [
-        State('prop-prop-graph', 'selectedData')
+        State('prop-prop-graph', 'selectedData'),
+        State('woce-flag-to-set', 'value')
     ]
 )
-def show_selected_points(click, in_points):
+def show_selected_points(click, in_points, flag_to_set):
+    if flag_to_set == 'WOCE_CO2_atm':
+        row_rules = constants.atm_edit_style
+    else:
+        row_rules = constants.water_edit_style
     if in_points is not None:
         all_data_string = redis_instance.hget("cache","plot-data").decode('utf-8')
         all_data_json = json.loads(all_data_string)
@@ -1295,15 +1310,32 @@ def show_selected_points(click, in_points):
         # TODO These are the columns from the plot, maybe we should use the columns defined as necessary for setting the flags
         column_names = sorted(all_data.columns, key=str.casefold)
         column_names.remove('WOCE_CO2_water')
-        column_names.insert(0, 'WOCE_CO2_water')
         column_names.remove('WOCE_CO2_atm')
-        column_names.insert(1, 'WOCE_CO2_atm')
+        column_names.insert(0, flag_to_set)        
         columnDefs = []
         for idx, i in enumerate(column_names):
             if 'time' in i:
                 columnDefs.append({"field": i, "headerName": i, 'sortable': True})
+            elif 'WOCE' in i:
+                if idx == 0:
+                    checks = True
+                else:
+                    checks = False
+                columnDefs.append({
+                    "field": i, "headerName": i, 
+                    "checkboxSelection": checks,
+                    'cellEditorParams': {'values': [2, 3, 4]},
+                    "editable": True,
+                    'cellEditor': 'agSelectCellEditor',
+                    'cellClassRules': {
+                        'green-cell': 'params.value == 2',
+                        'yellow-cell': 'params.value == 3',
+                        'red-cell': 'params.value == 4',
+                    },
+                    'sortable': True
+                })
             else:
-                columnDefs.append({"field": i, "headerName": i})
+                columnDefs.append({"field": i, "headerName": i, 'sortable': True})
         selected_points = in_points['points']
         times = []
         for point in selected_points:
@@ -1311,7 +1343,7 @@ def show_selected_points(click, in_points):
             times.append(customs[0])
         to_show = all_data.loc[all_data['time'].isin(times)]
         redis_instance.hset("cache", 'edit-table-data', json.dumps(to_show.to_json()))
-        return [to_show.to_dict("records"), columnDefs]
+        return [to_show.to_dict("records"), columnDefs, row_rules]
     else:
         raise exceptions.PreventUpdate
 

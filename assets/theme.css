@@ -1,3 +1,26 @@
+/* 
+  AG Grid WOCE cell classes
+*/
+
+.green-cell {
+  background-color: #e6ffe6;
+}
+.green-cell:hover {
+  background-color: #ccffcc;
+}
+.yellow-cell {
+  background-color: #ffffe6;
+}
+.yellow-cell:hover {
+  background-color: #ffffcc;
+}
+.red-cell {
+  background-color: #ffe6e6;
+}
+.red-cell:hover {
+  background-color: #ffcccc;
+}
+
 /*
 .mapboxgl-ctrl-attrib-button {
     display: None !important;
