@@ -47,6 +47,11 @@ import util
 from datetime import datetime
 
 
+plot_config = {
+    'displaylogo': False
+}
+
+
 def get_blank(message):
     plot_bg = 'rgba(1.0, 1.0, 1.0 ,1.0)'
     blank_graph = go.Figure(go.Scatter(x=[0, 1], y=[0, 1], showlegend=False))
@@ -209,6 +214,17 @@ organization_options = []
 for organization in sorted(organizations):
     organization_options.append({'value': organization, 'label': organization})
 
+socat_versions = list(edf['socat_version'].unique())
+socat_version_options = []
+                                            # shortest, then alphabetically
+for socat_version in sorted(socat_versions, key=lambda s: (len(s), s)):
+    socat_version_options.append({'value': socat_version, 'label': socat_version})
+
+platform_names = list(edf['platform_name'].unique())
+platform_name_options = []
+for platform_name in sorted(platform_names):
+    platform_name_options.append({'value': platform_name, 'label': platform_name})
+
 # Define Dash application structure
 app = Dash(__name__)
 server = app.server  # expose server variable for Procfile
@@ -331,13 +347,16 @@ app.layout = ddk.App(show_editor=True, theme=theme, children=[
                         dcc.Dropdown(id='organization', placeholder='Organizations', searchable=True, options=organization_options),
                     ]),
                     ddk.ControlCard(children=[
+                        ddk.CardHeader("SOCAT Version"),
+                        dcc.Dropdown(id='socat-version', placeholder='Select SOCAT Version', clearable=True, multi=True, options=socat_version_options),  
+                    ]),
+                    ddk.ControlCard(children=[
                         ddk.CardHeader("QC Flag"),
                         dcc.Dropdown(id='qc-flag', placeholder='Select QC Flag', clearable=True, multi=True, 
                             options=[
                                     {'label': 'A', 'value': 'A'},
                                     {'label': 'B', 'value': 'B'},
                                     {'label': 'C', 'value': 'C'},
-                                    {'label': 'D', 'value': 'D'},
                                     {'label': 'E', 'value': 'E'},
                                     {'label': 'Q', 'value': 'Q'},
                                     {'label': 'U', 'value': 'U'},
@@ -346,6 +365,10 @@ app.layout = ddk.App(show_editor=True, theme=theme, children=[
                             # value=["Q", "U", "N"]
                         ),   
                     ]),
+                    ddk.ControlCard(children=[
+                        ddk.CardHeader("Platform Name"),
+                        dcc.Dropdown(id='platform-name', placeholder='Select Platform Name', clearable=True, multi=True, options=platform_name_options)
+                    ]),                   
                     ddk.ControlCard(children=[
                         ddk.CardHeader("Platform Type"),
                         dcc.Dropdown(id='platform-type', placeholder='Select Platform Type', clearable=True, multi=True, options=[
@@ -360,7 +383,7 @@ app.layout = ddk.App(show_editor=True, theme=theme, children=[
             ]),
             ddk.Card(width=.75, style={'height': '86vh'}, children=[
                 ddk.CardHeader(id='map-graph-header', title='Select search latitude and longitude range'),                 
-                    ddk.Graph(id='map-graph', style={'height': '95%', 'width':'95%'}, 
+                    ddk.Graph(id='map-graph', style={'height': '95%', 'width':'95%'}, config=plot_config,
                 ),
             ]),
            
@@ -378,18 +401,18 @@ app.layout = ddk.App(show_editor=True, theme=theme, children=[
                         ])
                     ])
                 ]),
-                dcc.Tab(id='tracks-sub-tab', label='Map of Selected Cruise', value='tracks-sub-tab', style=tab_style, selected_style=tab_selected_style, children=[
+                dcc.Tab(id='tracks-sub-tab', label='Map of Selected Cruises', value='tracks-sub-tab', style=tab_style, selected_style=tab_selected_style, children=[
                     ddk.Card(style={'height': '86vh'}, children=[
                         dcc.Loading(children=[
                             ddk.CardHeader(id='cruise-tracks-header', title='Select search search criteria on the first tab.'),
                             html.Div(id='track-data-loading', style={'display': 'none'})
                         ]),
-                        ddk.Graph(id='cruise-tracks', style={'height': '95%', 'width':'95%'},),
+                        ddk.Graph(id='cruise-tracks', style={'height': '95%', 'width':'95%'}, config=plot_config),
                     ]),
                 ])
             ])
         ]),
-        dcc.Tab(id='plots', value='plots', label='Plots and QC', style=tab_style, selected_style=tab_selected_style, children=[
+        dcc.Tab(id='plots-tab', value='plots', label='Plots and QC', style=tab_style, selected_style=tab_selected_style, children=[
                 ddk.Card(width=.25, children=[
                     ddk.ControlCard(children=[
                         ddk.CardHeader('Download Data'),
@@ -421,7 +444,7 @@ app.layout = ddk.App(show_editor=True, theme=theme, children=[
                                 ]),
                             ]),
                             # dcc.Loading(
-                                ddk.Graph(id='trace-graph', style={'height': '95%', 'width':'95%'}
+                                ddk.Graph(id='trace-graph', style={'height': '95%', 'width':'95%'}, config=plot_config,
                                     # config={'modeBarButtonsToAdd':
                                     #     [
                                     #         'zoom2d',
@@ -491,7 +514,7 @@ app.layout = ddk.App(show_editor=True, theme=theme, children=[
                         ddk.Card(children=[
                             dcc.Loading(children=[
                                 ddk.CardHeader(id='prop-prop-graph-header', title='Property-proptery plot'),
-                                dcc.Graph(id='prop-prop-graph', style={'height':'60vh'}), 
+                                dcc.Graph(id='prop-prop-graph', style={'height':'60vh'}, config=plot_config), 
                                 html.Div(id='prop-prop-loading') # Hides the card while the data is being pulled from ERDDAP
                             ])
                         ])
@@ -503,16 +526,17 @@ app.layout = ddk.App(show_editor=True, theme=theme, children=[
                             ]),
                             dcc.Loading(
                                 dcc.Graph(id='thumbnails-graph', style={'height': image_height+40},
-                                    config={'modeBarButtonsToAdd':
-                                        [
-                                            'zoom2d',
-                                            'drawopenpath',
-                                            'drawclosedpath',
-                                            'drawcircle',
-                                            'drawrect',
-                                            'eraseshape'
-                                        ]
-                                    }
+                                    config=plot_config,
+                                    # config={'modeBarButtonsToAdd':
+                                    #     [
+                                    #         'zoom2d',
+                                    #         'drawopenpath',
+                                    #         'drawclosedpath',
+                                    #         'drawcircle',
+                                    #         'drawrect',
+                                    #         'eraseshape'
+                                    #     ]
+                                    # }
                                 ),
                             ),
                         ]),
@@ -551,7 +575,7 @@ app.layout = ddk.App(show_editor=True, theme=theme, children=[
                                         dcc.RadioItems(id='fco2-comment',
                                             options=[
                                                 {'label': '< 2 μatm (A, B)', 'value': 'fco2two'},
-                                                {'label': '< 5 μatm (C, D)', 'value': 'fco2five'},
+                                                {'label': '< 5 μatm (C)', 'value': 'fco2five'},
                                                 {'label': '< 10 μatm (E)', 'value': 'fco2ten'},
                                                 {'label': '> 10 μatm (F, S)', 'value': 'fco2bad'},
                                                 {'label': '(no comment)', 'value': 'fco2no'},
@@ -561,20 +585,19 @@ app.layout = ddk.App(show_editor=True, theme=theme, children=[
                                     ddk.ControlItem(label='Followed approved methods/SOP criteria:', children=[
                                         dcc.RadioItems(id='sop-comment', options=[
                                             {'label': 'true (A, B)', 'value':'soptrue'},
-                                            {'label': 'false (C, D, E) - specify not followed in additional comments', 'value': 'sopfalse'},
+                                            {'label': 'false (C, E) - specify not followed in additional comments', 'value': 'sopfalse'},
                                             {'label': '(no comment)', 'value': 'sopno'}
                                         ], value='sopno' )
                                     ]),
                                     ddk.ControlItem(label='Metadata documentation:', children=[
                                         dcc.RadioItems(id='meta-comment', options=[
                                             {'label': 'complete (A, B, C, E)', 'value': 'metacomplete'},
-                                            {'label': 'incomplete (D) - specify missing in additional comments', 'value': 'metalacking'},
                                             {'label': '(no comment)', 'value': 'metano'}
                                         ], value='metano' )
                                     ]),
                                     ddk.ControlItem( label='Data quality:', children=[
                                         dcc.RadioItems(id='data-comment', options=[
-                                            {'label': 'acceptable (A, B, C, D, E)', 'value': 'datagood'},
+                                            {'label': 'acceptable (A, B, C, E)', 'value': 'datagood'},
                                             {'label': 'significant amount of unacceptable data (F, S)', 'value': 'databad'},
                                             {'label': '(no comment)', 'value': 'datano'}
                                         ], value='datano')
@@ -582,7 +605,7 @@ app.layout = ddk.App(show_editor=True, theme=theme, children=[
                                     ddk.ControlItem(label='High-quality cross-over:',  children=[
                                         dcc.RadioItems(id='xover-comment', options=[
                                             {'label': 'found with dataset (A)', 'value': 'crossfound'},
-                                            {'label': 'none found (B, C, D, E)', 'value': 'crossnone'},
+                                            {'label': 'none found (B, C, E)', 'value': 'crossnone'},
                                             {'label': '(no comment)', 'value': 'crossno'}
                                         ], value='crossno')
                                     ]),
@@ -592,7 +615,6 @@ app.layout = ddk.App(show_editor=True, theme=theme, children=[
                                             {'label': 'A', 'value': 'A'},
                                             {'label': 'B', 'value': 'B'},
                                             {'label': 'C', 'value': 'C'},
-                                            {'label': 'D', 'value': 'D'},
                                             {'label': 'E', 'value': 'E'},
                                             {'label': 'F', 'value': 'F'},
                                             {'label': 'Suspend', 'value': 'suspend'},
@@ -781,7 +803,8 @@ def show_cruise_qc(click, expocode_to_show):
             columnDefs.append({"field": i, "headerName": i, 'wrapText': True, 'autoHeight': True, 'cellStyle': {"lineHeight": "unset"}})
         return [columnDefs, records.to_dict("records"), f'Cruise QC for {expocode_to_show}']
     else:
-        return [[], pd.DataFrame(),'No expocode selected.']
+        df = pd.DataFrame()
+        return [[], df.to_dict("records"),'No expocode selected.']
 
 
 @app.callback(
@@ -1020,8 +1043,26 @@ def cache_plot_data(in_plot_expocode):
 
 @app.callback(
     [
-        Output('trace-graph', 'figure'),
-        Output('trace-graph-header', 'title'),
+        Output('trace-graph', 'figure', allow_duplicate=True),
+        Output('trace-graph-header', 'title', allow_duplicate=True),
+    ],
+    [
+        Input('top-level-tabs', 'value')
+    ], prevent_initial_call=True
+)
+def reset_trace(tab):
+    if tab == 'map':
+        return [get_blank("Don't see the cruises you expect?<br>Go back and click the Find Cruises button."), no_update]
+    elif tab =='table':
+        return [get_blank("Plotting the selected cruise.<br>Switch cruises using the menu."), no_update]
+    else:
+        return [no_update, no_update]
+
+
+@app.callback(
+    [
+        Output('trace-graph', 'figure', allow_duplicate=True),
+        Output('trace-graph-header', 'title', allow_duplicate=True),
     ],
     [
         Input('plot-data-change','data'),
@@ -1046,7 +1087,7 @@ def update_trace(in_change, trace_in_variable, trace_in_expocode, ):
             redis_instance.hset('cache', str(code), json.dumps(df.to_json()))
             redis_instance.hexpire('cache', 3600, code)
     else:
-        return [get_blank('Plot is being created or you need to select an expocode.'), no_update]  
+        return [get_blank("Don't see the cruises you expect?<br>Go back and click the Find Cruises button."), no_update]  
 
     df = df.loc[df[trace_in_variable].notna()]
     rmin = df[trace_in_variable].min()
@@ -1258,21 +1299,21 @@ def get_map_ranges(df):
     ]
 )
 def show_selected_points(click, in_points, flag_to_set):
-
+    all_data_string = redis_instance.hget("cache","plot-data").decode('utf-8')
+    all_data_json = json.loads(all_data_string)
+    all_data = pd.read_json(StringIO(all_data_json))
     if flag_to_set == 'WOCE_CO2_atm':
         row_rules = constants.atm_edit_style
     else:
         row_rules = constants.water_edit_style
+    column_names = sorted(all_data.columns, key=str.casefold)
+    column_names.remove('WOCE_CO2_water')
+    column_names.remove('WOCE_CO2_atm')
+    column_names.insert(0, flag_to_set) 
     row_item_label = f'Set {flag_to_set} Checked Rows:'
     if in_points is not None:
-        all_data_string = redis_instance.hget("cache","plot-data").decode('utf-8')
-        all_data_json = json.loads(all_data_string)
-        all_data = pd.read_json(StringIO(all_data_json))
         # TODO These are the columns from the plot, maybe we should use the columns defined as necessary for setting the flags
-        column_names = sorted(all_data.columns, key=str.casefold)
-        column_names.remove('WOCE_CO2_water')
-        column_names.remove('WOCE_CO2_atm')
-        column_names.insert(0, flag_to_set)        
+       
         columnDefs = []
         for idx, i in enumerate(column_names):
             if 'time' in i:
@@ -1306,7 +1347,8 @@ def show_selected_points(click, in_points, flag_to_set):
         redis_instance.hset("cache", 'edit-table-data', json.dumps(to_show.to_json()))
         return [to_show.to_dict("records"), columnDefs, row_rules, row_item_label]
     else:
-        raise exceptions.PreventUpdate
+        to_show = pd.DataFrame(columns=column_names)
+        return [to_show.to_dict("records"), no_update, no_update, 'No points where selected. Use the Box Select tool to select points to edit.']
 
 
 
@@ -1456,7 +1498,7 @@ def make_property_property(plot_data_store, in_prop_prop_x, in_prop_prop_y, in_p
         )
 
 
-
+    figure.update_layout(margin={'t': 40})
     plot_data = df[columns_for_WOCE_edits]
     redis_instance.hset("cache", "plot-data", json.dumps(plot_data.to_json()))
     return[figure, card_title]
@@ -1609,7 +1651,7 @@ def set_expo_from_table_click(cell):
         Output('plot-expocode', 'options'),
         Output('plot-expocode', 'value'),
         Output('make-cruise-tracks', 'data'),
-        Output('track-data-loading', 'children')
+        Output('track-data-loading', 'children'),
     ],
     [
         Input('top-level-tabs', 'value')
@@ -1622,18 +1664,24 @@ def set_expo_from_table_click(cell):
         State('region', 'value'),
         State('investigator', 'value'),
         State('organization', 'value'),
+        State('socat-version', 'value'),
         State('qc-flag', 'value'),
+        State('platform-name', 'value'),
         State('platform-type', 'value'),
         State('map-info', 'data')
     ], prevent_initial_call=True
 )
-def make_table_of_crusies(da_click, mt_in_expocodes, mt_in_start_date, mt_in_end_date, mt_in_woce_water, mt_in_regions, mt_in_investigator, mt_in_org, mt_in_qc_flag, mt_in_platform_type, mt_in_map_info):
-    if da_click != "table":
+def make_table_of_crusies(da_click, mt_in_expocodes, mt_in_start_date, mt_in_end_date, mt_in_woce_water, mt_in_regions, mt_in_investigator, mt_in_org, mt_in_version, mt_in_qc_flag, mt_in_platform_name, mt_in_platform_type, mt_in_map_info):
+    if da_click == "map" or da_click == 'plots':
         return [no_update, no_update, no_update, no_update, no_update, no_update]
+
+
     vars_to_get = ['expocode', 'platform_name',	'platform_type', 'investigators', 'qc_flag', 'socat_version']
     expo_con = util.make_con('expocode', mt_in_expocodes)
     time_con = '&time>='+mt_in_start_date+'&time<='+mt_in_end_date
     investigator_con = util.make_con('investigators', mt_in_investigator)
+    ver_con = util.make_con('socat_version', mt_in_version)
+    name_con = util.make_con('platform_name', mt_in_platform_name)
     org_con = util.make_con('organization', mt_in_org)
     if org_con:
         vars_to_get.append('organization')
@@ -1643,7 +1691,7 @@ def make_table_of_crusies(da_click, mt_in_expocodes, mt_in_start_date, mt_in_end
     region_con = util.make_con('region_id', mt_in_regions)
     if region_con:
         vars_to_get.append('region_id')
-    url = decimated_url + '.csv?' + ','.join(vars_to_get) + expo_con + region_con + time_con + woce_water_con + investigator_con + org_con + qc_flag_con + platform_type_con + region_con
+    url = decimated_url + '.csv?' + ','.join(vars_to_get) + expo_con + region_con + time_con + woce_water_con + investigator_con + org_con + ver_con + qc_flag_con + name_con + platform_type_con + region_con
     if not region_con and mt_in_map_info is not None and len(mt_in_map_info) > 3:
         bounds = json.loads(mt_in_map_info)
         cons = maputil.get_socat_subset(bounds['ll']['longitude'], bounds['ur']['longitude'],bounds['ll']['latitude'],bounds['ur']['latitude'])
@@ -1680,14 +1728,20 @@ def make_table_of_crusies(da_click, mt_in_expocodes, mt_in_start_date, mt_in_end
         {'field': 'socat_version', 'headerName': 'SOCAT Version'}
     ]  
 
-    expos = sorted(list(df['expocode']))
-    for code in expos:
-        expo_options.append({'label': code, 'value': code})
-    expo_value = expos[0]
-    # Cache the table so we can extract the version number when/if we go to save a QC entry
-    # and so we can make a map from the locations database
-    redis_instance.hset('cache', 'table-of-cruises', json.dumps(df.to_json()))
-    return [df.to_dict("records"), table_of_cruises_columnDefs, expo_options, expo_value, 'go', '']
+    if df.shape[0] > 0:
+        expos = sorted(list(df['expocode']))
+        for code in expos:
+            expo_options.append({'label': code, 'value': code})
+        expo_value = expos[0]
+        # Cache the table so we can extract the version number when/if we go to save a QC entry
+        # and so we can make a map from the locations database
+        redis_instance.hset('cache', 'table-of-cruises', json.dumps(df.to_json()))
+        return [df.to_dict("records"), table_of_cruises_columnDefs, expo_options, expo_value, 'go', '']
+    else:
+        df = pd.DataFrame(columns=['no_data'])
+        redis_instance.hset('cache', 'table-of-cruises', json.dumps(df.to_json()))
+        tcd = [{'field': 'no_data', 'headerName': 'No matching cruises found...'}]
+        return [df.to_dict("records"), tcd, {}, '', 'go', '']
 
 
 @app.callback(
@@ -1702,26 +1756,42 @@ def make_table_of_crusies(da_click, mt_in_expocodes, mt_in_start_date, mt_in_end
 def make_cruise_tracks(trigger):
     track_list_string = redis_instance.hget('cache', 'table-of-cruises').decode('utf-8')
     crusies_to_track = pd.read_json(StringIO(json.loads(track_list_string)), dtype=dtype_definitions)
-    expos = list(crusies_to_track['expocode'].unique())
-    in_set = "','".join(expos)
-    in_set = "'" + in_set + "'"
-    track_data = pd.read_sql(f"SELECT * FROM tracks WHERE expocode IN ({in_set}) AND platform_type != 'Mooring'", con=postgres_engine)
-    stations = pd.read_sql(f"SELECT * FROM tracks WHERE expocode IN ({in_set}) AND platform_type = 'Mooring'", con=postgres_engine)
-    if track_data.shape[0] > 100_000:
-        track_data = track_data.sample(n=100_000)
-    track_data = track_data.sort_values(['expocode', 'time'])
-    figure = px.line_geo(track_data, lat='latitude', lon='longitude', color='expocode', 
-                        hover_data=['expocode', 'time', 'latitude', 'longitude'],
-                        )
-    figure.update_traces(line={'width': 5})
-    stat_fig = px.scatter_geo(stations, lat='latitude', lon='longitude', color='expocode', 
-                              hover_data=['expocode', 'time', 'latitude', 'longitude'])
-    figure.add_traces(list(stat_fig.select_traces()))
-    figure.update_layout(legend={'orientation' : "v", 'x': 1, 'y': 1, 'xanchor': 'right', 'yanchor': 'top'})
-    figure.update_geos(fitbounds='locations', lonaxis_range=[-180,180], lataxis_range=[-90,90])
-    figure.update_geos(showland=True, coastlinecolor='black', coastlinewidth=1, landcolor='tan', resolution=50)
-    title=f'Approximate Cruise Tracks for the Selected Cruises. {str(len(expos))} total tracks.'
-    return [figure, title]
+    if crusies_to_track.shape[0] > 0:
+        expos = list(crusies_to_track['expocode'].unique())
+        in_set = "','".join(expos)
+        in_set = "'" + in_set + "'"
+        track_data = pd.read_sql(f"SELECT * FROM tracks WHERE expocode IN ({in_set}) AND platform_type != 'Mooring'", con=postgres_engine)
+        stations = pd.read_sql(f"SELECT * FROM tracks WHERE expocode IN ({in_set}) AND platform_type = 'Mooring'", con=postgres_engine)
+        if track_data.shape[0] > 100_000:
+            track_data = track_data.sample(n=100_000)
+        track_data = track_data.sort_values(['expocode', 'time'])
+        figure = px.line_geo(track_data, lat='latitude', lon='longitude', color='expocode', 
+                            hover_data=['expocode', 'time', 'latitude', 'longitude'],
+                            )
+        figure.update_traces(line={'width': 5})
+        stat_fig = px.scatter_geo(stations, lat='latitude', lon='longitude', color='expocode', 
+                                hover_data=['expocode', 'time', 'latitude', 'longitude'])
+        figure.add_traces(list(stat_fig.select_traces()))
+        if len(expos) > 500:
+            figure.update_layout(showlegend=False)
+            figure.add_annotation(
+                text="Too many cruises<br>to show legend...",
+                showarrow=False,
+                yref="paper",
+                yanchor="top",
+                y=.98,
+                xanchor="right",
+                xref="paper",
+                x=.98    
+            )
+        else:
+            figure.update_layout(legend={'orientation' : "v", 'x': 1, 'y': 1, 'xanchor': 'right', 'yanchor': 'top'})
+        figure.update_geos(fitbounds='locations', lonaxis_range=[-180,180], lataxis_range=[-90,90])
+        figure.update_geos(showland=True, coastlinecolor='black', coastlinewidth=1, landcolor='tan', resolution=50)
+        title=f'Approximate Cruise Tracks for the Selected Cruises. {str(len(expos))} total tracks.'
+        return [figure, title]
+    else:
+        return[get_blank('No matching cruises found...'), 'No matching cruises found...']
 
 
 @app.callback(
@@ -1802,7 +1872,9 @@ def set_bounds_from_region(region_id):
         Output('end-date-picker', 'value', allow_duplicate=True),
         Output('investigator', 'value', allow_duplicate=True),
         Output('organization', 'value', allow_duplicate=True),
+        Output('socat-version', 'value', allow_duplicate=True),
         Output('qc-flag', 'value', allow_duplicate=True),
+        Output('platform-name', 'value', allow_duplicate=True),
         Output('platform-type', 'value', allow_duplicate=True),
         Output('expocode', 'value'),
         Output('ll_lat', 'value', allow_duplicate=True),
@@ -1817,7 +1889,7 @@ def set_bounds_from_region(region_id):
     ], prevent_initial_call=True
 )
 def reset_map(click, min_date, max_date):
-    return ['', [], [], min_date, max_date, '', '', [], [], [], -90, -180, 90, 180]
+    return ['', [], [], min_date, max_date, '', '', [], [], [], [], [], -90, -180, 90, 180]
 
 
 def cc_color_set(index, palette):
