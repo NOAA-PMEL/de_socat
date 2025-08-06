@@ -51,6 +51,16 @@ plot_config = {
     'displaylogo': False
 }
 
+main_map_config = {
+    'displaylogo': False,
+    'modeBarButtonsToRemove': ['lasso2d'] 
+}
+
+map_plot_config = {
+    'displaylogo': False,
+    'modeBarButtonsToRemove': ['select2d', 'lasso2d']
+}
+
 
 def get_blank(message):
     plot_bg = 'rgba(1.0, 1.0, 1.0 ,1.0)'
@@ -383,7 +393,7 @@ app.layout = ddk.App(show_editor=True, theme=theme, children=[
             ]),
             ddk.Card(width=.75, style={'height': '86vh'}, children=[
                 ddk.CardHeader(id='map-graph-header', title='Select search latitude and longitude range'),                 
-                    ddk.Graph(id='map-graph', style={'height': '95%', 'width':'95%'}, config=plot_config,
+                    ddk.Graph(id='map-graph', style={'height': '95%', 'width':'95%'}, config=main_map_config,
                 ),
             ]),
            
@@ -407,7 +417,7 @@ app.layout = ddk.App(show_editor=True, theme=theme, children=[
                             ddk.CardHeader(id='cruise-tracks-header', title='Select search search criteria on the first tab.'),
                             html.Div(id='track-data-loading', style={'display': 'none'})
                         ]),
-                        ddk.Graph(id='cruise-tracks', style={'height': '95%', 'width':'95%'}, config=plot_config),
+                        ddk.Graph(id='cruise-tracks', style={'height': '95%', 'width':'95%'}, config=map_plot_config),
                     ]),
                 ])
             ])
@@ -444,7 +454,7 @@ app.layout = ddk.App(show_editor=True, theme=theme, children=[
                                 ]),
                             ]),
                             # dcc.Loading(
-                                ddk.Graph(id='trace-graph', style={'height': '95%', 'width':'95%'}, config=plot_config,
+                                ddk.Graph(id='trace-graph', style={'height': '95%', 'width':'95%'}, config=map_plot_config,
                                     # config={'modeBarButtonsToAdd':
                                     #     [
                                     #         'zoom2d',
@@ -1674,8 +1684,6 @@ def set_expo_from_table_click(cell):
 def make_table_of_crusies(da_click, mt_in_expocodes, mt_in_start_date, mt_in_end_date, mt_in_woce_water, mt_in_regions, mt_in_investigator, mt_in_org, mt_in_version, mt_in_qc_flag, mt_in_platform_name, mt_in_platform_type, mt_in_map_info):
     if da_click == "map" or da_click == 'plots':
         return [no_update, no_update, no_update, no_update, no_update, no_update]
-
-
     vars_to_get = ['expocode', 'platform_name',	'platform_type', 'investigators', 'qc_flag', 'socat_version']
     expo_con = util.make_con('expocode', mt_in_expocodes)
     time_con = '&time>='+mt_in_start_date+'&time<='+mt_in_end_date
@@ -1704,6 +1712,7 @@ def make_table_of_crusies(da_click, mt_in_expocodes, mt_in_start_date, mt_in_end
         df = pd.read_csv(url, skiprows=[1], dtype=dtype_definitions)
     except:
         df = pd.DataFrame()
+    
     if not df.empty:
         df['expocode'] = df['expocode'].astype(str)
         df['thumbnails'] = df.loc[:, 'expocode']
@@ -1760,8 +1769,9 @@ def make_cruise_tracks(trigger):
         expos = list(crusies_to_track['expocode'].unique())
         in_set = "','".join(expos)
         in_set = "'" + in_set + "'"
-        track_data = pd.read_sql(f"SELECT * FROM tracks WHERE expocode IN ({in_set}) AND platform_type != 'Mooring'", con=postgres_engine)
-        stations = pd.read_sql(f"SELECT * FROM tracks WHERE expocode IN ({in_set}) AND platform_type = 'Mooring'", con=postgres_engine)
+        ex_con = util.make_query('expocode', expos, False)
+        track_data = pd.read_sql(f"SELECT * FROM tracks WHERE {ex_con} AND platform_type != 'Mooring'", con=postgres_engine)
+        stations = pd.read_sql(f"SELECT * FROM tracks WHERE {ex_con} AND platform_type = 'Mooring'", con=postgres_engine)
         if track_data.shape[0] > 100_000:
             track_data = track_data.sample(n=100_000)
         track_data = track_data.sort_values(['expocode', 'time'])
