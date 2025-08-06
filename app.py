@@ -353,6 +353,10 @@ app.layout = ddk.App(show_editor=True, theme=theme, children=[
                         dcc.Dropdown(id='investigator', placeholder='Investigators', clearable=True, multi=True, options=investigaors_options), 
                     ]),
                     ddk.ControlCard(children=[
+                        ddk.CardHeader("Valid Data"),
+                        dcc.Dropdown(id='valid_data', placeholder='Must contain data for...', searchable=True, options=variable_options, multi=True),
+                    ]),
+                    ddk.ControlCard(children=[
                         ddk.CardHeader("Organization"),
                         dcc.Dropdown(id='organization', placeholder='Organizations', searchable=True, options=organization_options),
                     ]),
@@ -1100,21 +1104,25 @@ def update_trace(in_change, trace_in_variable, trace_in_expocode, ):
         return [get_blank("Don't see the cruises you expect?<br>Go back and click the Find Cruises button."), no_update]  
 
     df = df.loc[df[trace_in_variable].notna()]
-    rmin = df[trace_in_variable].min()
-    rmax = df[trace_in_variable].max()
-    figure = px.scatter_geo(df,
-                            lat='latitude',
-                            lon='longitude',
-                            color=trace_in_variable,
-                            color_continuous_scale='Viridis',
-                            hover_data=['expocode','time','latitude','longitude',trace_in_variable],
-                            range_color=[rmin,rmax], custom_data=['expocode'],)
-    figure.update_traces(marker={'size':6})
-    figure.update_coloraxes(colorbar={'orientation':'v', 'title_side':'right'})
-    figure.update_geos(fitbounds='locations', lonaxis_range=[-180,180], lataxis_range=[-90,90])
-    figure.update_geos(showland=True, coastlinecolor='black', coastlinewidth=1, landcolor='tan', resolution=50)
-    # figure.update_coloraxes(colorbar={'orientation':'h', 'thickness':20, 'y': -.175, 'title': None})
-    title = f'All {trace_in_variable} data from {str(trace_in_expocode)}'
+    if df.shape[0] > 1:
+        rmin = df[trace_in_variable].min()
+        rmax = df[trace_in_variable].max()
+        figure = px.scatter_geo(df,
+                                lat='latitude',
+                                lon='longitude',
+                                color=trace_in_variable,
+                                color_continuous_scale='Viridis',
+                                hover_data=['expocode','time','latitude','longitude',trace_in_variable],
+                                range_color=[rmin,rmax], custom_data=['expocode'],)
+        figure.update_traces(marker={'size':6})
+        figure.update_coloraxes(colorbar={'orientation':'v', 'title_side':'right'})
+        figure.update_geos(fitbounds='locations', lonaxis_range=[-180,180], lataxis_range=[-90,90])
+        figure.update_geos(showland=True, coastlinecolor='black', coastlinewidth=1, landcolor='tan', resolution=50)
+        # figure.update_coloraxes(colorbar={'orientation':'h', 'thickness':20, 'y': -.175, 'title': None})
+        title = f'All {trace_in_variable} data from {str(trace_in_expocode)}'
+    else:
+        figure = get_blank(f'No data found for {trace_in_variable}.')
+        title = f'No data found for {trace_in_variable}.'
     #DEBUG
     print(f'returning value from trace of {trace_in_expocode}')
     return [figure, title]
@@ -1673,6 +1681,7 @@ def set_expo_from_table_click(cell):
         State('woce-co2-water', 'value'),
         State('region', 'value'),
         State('investigator', 'value'),
+        State('valid_data', 'value'),
         State('organization', 'value'),
         State('socat-version', 'value'),
         State('qc-flag', 'value'),
@@ -1681,10 +1690,14 @@ def set_expo_from_table_click(cell):
         State('map-info', 'data')
     ], prevent_initial_call=True
 )
-def make_table_of_crusies(da_click, mt_in_expocodes, mt_in_start_date, mt_in_end_date, mt_in_woce_water, mt_in_regions, mt_in_investigator, mt_in_org, mt_in_version, mt_in_qc_flag, mt_in_platform_name, mt_in_platform_type, mt_in_map_info):
+def make_table_of_crusies(da_click, mt_in_expocodes, mt_in_start_date, mt_in_end_date, mt_in_woce_water, mt_in_regions, mt_in_investigator, mt_in_valid_data, mt_in_org, mt_in_version, mt_in_qc_flag, mt_in_platform_name, mt_in_platform_type, mt_in_map_info):
     if da_click == "map" or da_click == 'plots':
         return [no_update, no_update, no_update, no_update, no_update, no_update]
     vars_to_get = ['expocode', 'platform_name',	'platform_type', 'investigators', 'qc_flag', 'socat_version']
+    valid_con = ''
+    if mt_in_valid_data is not None and len(mt_in_valid_data)>0:
+        for var in mt_in_valid_data:
+            valid_con = valid_con + f'&{var}!=NaN'
     expo_con = util.make_con('expocode', mt_in_expocodes)
     time_con = '&time>='+mt_in_start_date+'&time<='+mt_in_end_date
     investigator_con = util.make_con('investigators', mt_in_investigator)
@@ -1699,7 +1712,7 @@ def make_table_of_crusies(da_click, mt_in_expocodes, mt_in_start_date, mt_in_end
     region_con = util.make_con('region_id', mt_in_regions)
     if region_con:
         vars_to_get.append('region_id')
-    url = decimated_url + '.csv?' + ','.join(vars_to_get) + expo_con + region_con + time_con + woce_water_con + investigator_con + org_con + ver_con + qc_flag_con + name_con + platform_type_con + region_con
+    url = decimated_url + '.csv?' + ','.join(vars_to_get) + expo_con + valid_con + region_con + time_con + woce_water_con + investigator_con + org_con + ver_con + qc_flag_con + name_con + platform_type_con + region_con
     if not region_con and mt_in_map_info is not None and len(mt_in_map_info) > 3:
         bounds = json.loads(mt_in_map_info)
         cons = maputil.get_socat_subset(bounds['ll']['longitude'], bounds['ur']['longitude'],bounds['ll']['latitude'],bounds['ur']['latitude'])
