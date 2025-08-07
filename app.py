@@ -1495,6 +1495,7 @@ def make_property_property(plot_data_store, in_prop_prop_x, in_prop_prop_y, in_p
 
     df['expocode'] = df['expocode'].astype(str)
     df['WOCE_CO2_water'] = df['WOCE_CO2_water'].astype(str)
+    df['WOCE_CO2_atm'] = df['WOCE_CO2_atm'].astype(str)
 
     if in_prop_prop_colorby == 'expocode':
         cmap = px.colors.qualitative.Light24
@@ -1698,7 +1699,7 @@ def make_table_of_crusies(da_click, mt_in_expocodes, mt_in_start_date, mt_in_end
     if mt_in_valid_data is not None and len(mt_in_valid_data)>0:
         for var in mt_in_valid_data:
             valid_con = valid_con + f'&{var}!=NaN'
-    expo_con = util.make_con('expocode', mt_in_expocodes)
+    expo_con = util.make_con('expocode', mt_in_expocodes)d
     time_con = '&time>='+mt_in_start_date+'&time<='+mt_in_end_date
     investigator_con = util.make_con('investigators', mt_in_investigator)
     ver_con = util.make_con('socat_version', mt_in_version)
