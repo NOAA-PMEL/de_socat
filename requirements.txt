@@ -14,4 +14,5 @@ SQLAlchemy
 pg8000
 PyMySQL
 tenacity
+psycopg2-binary==2.9.10
 git+https://github.com/noaaroland/sdig.git

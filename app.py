@@ -242,6 +242,7 @@ if socat_mode == "QC_EDITOR":
     callbacks.register_editor_callbacks(app)
 
 
+
 footer_image = app.get_asset_url(
     "logo-PMEL-lockup-light_noaaPMEL_horizontal_rgb-txt_2024.png"
 )
@@ -428,7 +429,7 @@ def set_up(click_in):
 @app.callback(
     [
         Output('plot-data-change', 'data'),
-        Output('show','href'),
+        # Output('show','href'),
         Output('csv','href'),
         Output('netcdf','href'),
         Output('prop-prop-loading', 'children')
@@ -452,10 +453,11 @@ def cache_plot_data(in_plot_expocode):
             # DEBUG this is not working
             # redis version??????
             # redis_instance.hexpire('cache', 3600, expo)
-        return ['new_data', all_html_url, all_csv_url, all_nc_url, '']
+        # return ['new_data', all_html_url, all_csv_url, all_nc_url, '']
+        return ['new_data', all_csv_url, all_nc_url, '']
     else:
-        return ['no data', full_url, full_url, full_url,'']
-
+        # return ['no data', full_url, full_url, full_url,'']
+        return ['no data', full_url, full_url,'']
 
 @app.callback(
     [
@@ -746,6 +748,49 @@ def selectData(selectData):
         return[json.dumps(map_info), '']
 
 
+@app.callback(
+    [
+        Output('show-data-grid', 'columnDefs'),
+        Output('show-data-grid', 'rowData'),
+        Output('show-data-header', 'title')
+    ],
+    [
+        Input('show-button', 'n_clicks')
+    ],
+    [
+        State('plot-expocode', 'value'),
+        State('plot-data-change', 'data')
+    ], prevent_initial_call=True
+)
+def show_cruise(click, plot_in_expocode, plot_data_store):
+    if plot_in_expocode is None or len(plot_in_expocode) == 0:
+        raise exceptions.PreventUpdate
+
+    if plot_data_store == 'no':
+        # DEBUG print('no new data')
+        raise exceptions.PreventUpdate
+    
+    
+    if plot_in_expocode is not None and len(plot_in_expocode) > 0:
+        print('showing data for ' + plot_in_expocode)
+        if redis_instance.hexists('cache', str(plot_in_expocode)):
+            df_json_string = redis_instance.hget('cache', plot_in_expocode).decode('utf-8')
+            df = pd.read_json(StringIO(json.loads(df_json_string)), dtype=dtype_definitions)
+        else:
+            url = f'{full_url}.csv?{to_get}&expocode="{plot_in_expocode}"'            
+            df = pd.read_csv(url, skiprows=[1], dtype=dtype_definitions)
+            redis_instance.hset('cache', str(code), json.dumps(df.to_json()),)
+            redis_instance.hexpire('cache', 3600, code)
+        df.dropna(axis=1, how='all', inplace=True)
+        columnDefs = []
+        for column in df.columns:
+             columnDefs.append({'field': column, 'headerName': column})
+        print('returning data for cruise')
+        return [columnDefs, df.to_dict("records"), f'Data for {plot_in_expocode}']
+
+    else:
+        return [[], {}, 'No cruse found'] 
+
 
 @app.callback(
     [
@@ -985,14 +1030,17 @@ def make_thumbnails(plot_data_store, plot_in_expocode,):
 )
 def set_expo_from_table_click(cell):
     # DEBUG 
-    print(f"clicked on cell value:  {cell['value']}, column:   {cell['colId']}, row index:   {cell['rowIndex']}")
-    if cell['colId'] == 'prop':
-        return [cell['value'], 'plots', 'prop-prop-plot',]
-    elif cell['colId'] == 'thumbnails':
-        return [cell['value'], 'plots', 'prop-prop-thumbs',]
-    elif cell['colId'] == 'CruiseQC':
-        # TODO this isn't correct
-        return [cell['value'], 'plots', 'cruise-qc',]
+    if cell is not None:
+        print(f"clicked on cell value:  {cell['value']}, column:   {cell['colId']}, row index:   {cell['rowIndex']}")
+        if cell['colId'] == 'prop':
+            return [cell['value'], 'plots', 'prop-prop-plot',]
+        elif cell['colId'] == 'thumbnails':
+            return [cell['value'], 'plots', 'prop-prop-thumbs',]
+        elif cell['colId'] == 'CruiseQC':
+            # TODO this isn't correct
+            return [cell['value'], 'plots', 'cruise-qc',]
+        else:
+            raise exceptions.PreventUpdate
     else:
         raise exceptions.PreventUpdate
 

@@ -22,40 +22,107 @@ map_plot_config = {
 # QC flags and WOCE flags to be set.
 socat_mode = os.environ.get("SOCAT_MODE", "VIEWER")
 
+# Refactored to eliminate repeated code by Gemini
+
+# Define a base header
+header_children_base = [
+    ddk.Logo(
+        src="https://www.socat.info/wp-content/uploads/2017/06/cropped-socat_cat.png"
+    ),
+    ddk.Title("Surface Ocean CO\u2082 Atlas Data Viewer"),
+]
+
+# Define base property controls
+prop_prop_controls_base = [
+    ddk.CardHeader("Property-Property Controls"),
+    ddk.ControlItem(
+        label="X-axis",
+        children=[
+            dcc.Dropdown(
+                id="prop-prop-x",
+                value="time",
+                clearable=False,
+            )
+        ],
+    ),
+    ddk.ControlItem(
+        label="Y-axis",
+        children=[
+            dcc.Dropdown(
+                id="prop-prop-y",
+                value="fCO2_recommended",
+                clearable=False,
+            )
+        ],
+    ),
+    ddk.ControlItem(
+        label="Color By",
+        children=[
+            dcc.Dropdown(
+                id="prop-prop-colorby",
+                value="expocode",
+                clearable=False,
+            )
+        ],
+    ),
+]
+
+# Define base cruise QC children
+cruise_qc_children_base = [
+    ddk.CardHeader(
+        id="cruise-qc-card-header",
+        title="Cruise QC for ...",
+    ),
+    dag.AgGrid(
+        id="cruise-qc-grid",
+        dashGridOptions={"pagination": True},
+        columnSize="sizeToFit",
+        defaultColDef={"resizable": True},
+        style={
+            "height": 650,
+            "width": "100%",
+        },
+    ),
+]
+
+# Conditionally add QC-specific elements
 if socat_mode == "QC_EDITOR":
     title = "Surface Ocean CO\u2082 Atlas QC Editor"
-    header_children = [
-        ddk.Logo(
-            src="https://www.socat.info/wp-content/uploads/2017/06/cropped-socat_cat.png"
-        ),
-        ddk.Title(title),
-        ddk.Modal(
-            id="debug-woce-flag",
-            target_id="show-woce-edits-card",
-            hide_target=True,
-            children=[
-                html.Button(id="show-edits", children="DEBUG: See edited rows."),
-            ],
-        ),
-        ddk.Modal(
-            id="debug-qc-entries",
-            target_id="show-qc-entries-card",
-            hide_target=True,
-            children=[
-                html.Button(
-                    id="show-qc-entries", children="DEBUG: See added QC entries."
-                ),
-            ],
-        ),
-    ]
+
+    # Add QC-specific header children
+    header_children_base.extend(
+        [
+            ddk.Modal(
+                id="debug-woce-flag",
+                target_id="show-woce-edits-card",
+                hide_target=True,
+                children=[
+                    html.Button(id="show-edits", children="DEBUG: See edited rows."),
+                ],
+            ),
+            ddk.Modal(
+                id="debug-qc-entries",
+                target_id="show-qc-entries-card",
+                hide_target=True,
+                children=[
+                    html.Button(
+                        id="show-qc-entries", children="DEBUG: See added QC entries."
+                    ),
+                ],
+            ),
+        ]
+    )
+
     woce_edits_card = ddk.Card(
         id="show-woce-edits-card", children=[dag.AgGrid(id="edited-points")]
     )
     qc_entries_card = ddk.Card(
         id="show-qc-entries-card", children=[dag.AgGrid(id="qc-entries")]
     )
-    prop_prop_controls = [
-        ddk.CardHeader("Property-Property Controls"),
+
+    # Add QC-specific property controls
+    prop_prop_controls_base.insert(
+        1,
         ddk.ControlItem(
             label="Flag Selected Points",
             children=[
@@ -91,6 +158,9 @@ if socat_mode == "QC_EDITOR":
                 )
             ],
         ),
+    )
+    prop_prop_controls_base.insert(
+        2,
         ddk.Block(
             width=1,
             id="selected-points-card",
@@ -121,23 +191,13 @@ if socat_mode == "QC_EDITOR":
                                     multi=False,
                                     style={"width": "200px"},
                                     options=[
-                                        {
-                                            "value": "2",
-                                            "label": "2",
-                                        },
-                                        {
-                                            "value": "3",
-                                            "label": "3",
-                                        },
-                                        {
-                                            "value": "4",
-                                            "label": "4",
-                                        },
+                                        {"value": "2", "label": "2"},
+                                        {"value": "3", "label": "3"},
+                                        {"value": "4", "label": "4"},
                                     ],
                                 ),
                             ],
                         ),
-                        # ddk.ControlItem(children=[html.H6("Double click the WOCE Flag cell you want to change. When the menu appears, select the value you want to assign.")]),
                         ddk.ControlItem(
                             label="Save Flags",
                             children=[
@@ -178,42 +238,11 @@ if socat_mode == "QC_EDITOR":
                 ),
             ],
         ),
-        ddk.ControlItem(
-            label="X-axis",
-            children=[
-                dcc.Dropdown(
-                    id="prop-prop-x",
-                    value="time",
-                    clearable=False,
-                )
-            ],
-        ),
-        ddk.ControlItem(
-            label="Y-axis",
-            children=[
-                dcc.Dropdown(
-                    id="prop-prop-y",
-                    value="fCO2_recommended",
-                    clearable=False,
-                )
-            ],
-        ),
-        ddk.ControlItem(
-            label="Color By",
-            children=[
-                dcc.Dropdown(
-                    id="prop-prop-colorby",
-                    value="expocode",
-                    clearable=False,
-                )
-            ],
-        ),
-    ]
-    cruise_qc_children = [
-        ddk.CardHeader(
-            id="cruise-qc-card-header",
-            title="Cruise QC for ...",
-        ),
+    )
+
+    # Add QC-specific cruise QC children
+    cruise_qc_children_base.insert(
+        1,
         ddk.ControlCard(
             width=1.0,
             id="expo-menu",
@@ -240,16 +269,8 @@ if socat_mode == "QC_EDITOR":
                 )
             ],
         ),
-        dag.AgGrid(
-            id="cruise-qc-grid",
-            dashGridOptions={"pagination": True},
-            columnSize="sizeToFit",
-            defaultColDef={"resizable": True},
-            style={
-                "height": 650,
-                "width": "100%",
-            },
-        ),
+    )
+    cruise_qc_children_base.append(
         html.Div(
             id="add-qc-dialog-container",
             style={
@@ -277,14 +298,8 @@ if socat_mode == "QC_EDITOR":
                                 dcc.Checklist(
                                     id="qc-region-value",
                                     options=[
-                                        {
-                                            "label": "Costal",
-                                            "value": "costal",
-                                        },
-                                        {
-                                            "label": "Arctic",
-                                            "value": "arctic",
-                                        },
+                                        {"label": "Costal", "value": "costal"},
+                                        {"label": "Arctic", "value": "arctic"},
                                         {
                                             "label": "Global (Override regional QC flags)",
                                             "value": "global",
@@ -304,22 +319,13 @@ if socat_mode == "QC_EDITOR":
                                             "label": "< 2 μatm (A, B)",
                                             "value": "fco2two",
                                         },
-                                        {
-                                            "label": "< 5 μatm (C)",
-                                            "value": "fco2five",
-                                        },
-                                        {
-                                            "label": "< 10 μatm (E)",
-                                            "value": "fco2ten",
-                                        },
+                                        {"label": "< 5 μatm (C)", "value": "fco2five"},
+                                        {"label": "< 10 μatm (E)", "value": "fco2ten"},
                                         {
                                             "label": "> 10 μatm (F, S)",
                                             "value": "fco2bad",
                                         },
-                                        {
-                                            "label": "(no comment)",
-                                            "value": "fco2no",
-                                        },
+                                        {"label": "(no comment)", "value": "fco2no"},
                                     ],
                                     value="fco2no",
                                 )
@@ -331,18 +337,12 @@ if socat_mode == "QC_EDITOR":
                                 dcc.RadioItems(
                                     id="sop-comment",
                                     options=[
-                                        {
-                                            "label": "true (A, B)",
-                                            "value": "soptrue",
-                                        },
+                                        {"label": "true (A, B)", "value": "soptrue"},
                                         {
                                             "label": "false (C, E) - specify not followed in additional comments",
                                             "value": "sopfalse",
                                         },
-                                        {
-                                            "label": "(no comment)",
-                                            "value": "sopno",
-                                        },
+                                        {"label": "(no comment)", "value": "sopno"},
                                     ],
                                     value="sopno",
                                 )
@@ -358,10 +358,7 @@ if socat_mode == "QC_EDITOR":
                                             "label": "complete (A, B, C, E)",
                                             "value": "metacomplete",
                                         },
-                                        {
-                                            "label": "(no comment)",
-                                            "value": "metano",
-                                        },
+                                        {"label": "(no comment)", "value": "metano"},
                                     ],
                                     value="metano",
                                 )
@@ -381,10 +378,7 @@ if socat_mode == "QC_EDITOR":
                                             "label": "significant amount of unacceptable data (F, S)",
                                             "value": "databad",
                                         },
-                                        {
-                                            "label": "(no comment)",
-                                            "value": "datano",
-                                        },
+                                        {"label": "(no comment)", "value": "datano"},
                                     ],
                                     value="datano",
                                 )
@@ -404,10 +398,7 @@ if socat_mode == "QC_EDITOR":
                                             "label": "none found (B, C, E)",
                                             "value": "crossnone",
                                         },
-                                        {
-                                            "label": "(no comment)",
-                                            "value": "crossno",
-                                        },
+                                        {"label": "(no comment)", "value": "crossno"},
                                     ],
                                     value="crossno",
                                 )
@@ -419,38 +410,14 @@ if socat_mode == "QC_EDITOR":
                                 dcc.Dropdown(
                                     id="added-qc-flag",
                                     options=[
-                                        {
-                                            "label": "Comment",
-                                            "value": "comment",
-                                        },
-                                        {
-                                            "label": "A",
-                                            "value": "A",
-                                        },
-                                        {
-                                            "label": "B",
-                                            "value": "B",
-                                        },
-                                        {
-                                            "label": "C",
-                                            "value": "C",
-                                        },
-                                        {
-                                            "label": "E",
-                                            "value": "E",
-                                        },
-                                        {
-                                            "label": "F",
-                                            "value": "F",
-                                        },
-                                        {
-                                            "label": "Suspend",
-                                            "value": "suspend",
-                                        },
-                                        {
-                                            "label": "Exclude",
-                                            "value": "Exclude",
-                                        },
+                                        {"label": "Comment", "value": "comment"},
+                                        {"label": "A", "value": "A"},
+                                        {"label": "B", "value": "B"},
+                                        {"label": "C", "value": "C"},
+                                        {"label": "E", "value": "E"},
+                                        {"label": "F", "value": "F"},
+                                        {"label": "Suspend", "value": "suspend"},
+                                        {"label": "Exclude", "value": "Exclude"},
                                     ],
                                     value="comment",
                                     style={"width": "120px"},
@@ -487,67 +454,17 @@ if socat_mode == "QC_EDITOR":
                     ],
                 )
             ],
-        ),
-    ]
+        )
+    )
 else:
     title = "Surface Ocean CO\u2082 Atlas Data Viewer"
-    header_children = [
-        ddk.Logo(
-            src="https://www.socat.info/wp-content/uploads/2017/06/cropped-socat_cat.png"
-        ),
-        ddk.Title(title),
-    ]
     woce_edits_card = html.Div(id="show-woce-edits-card", style={"display": "none"})
     qc_entries_card = html.Div(id="show-qc-entries-card", style={"display": "none"})
-    prop_prop_controls = [
-        ddk.CardHeader("Property-Property Controls"),
-        ddk.ControlItem(
-            label="X-axis",
-            children=[
-                dcc.Dropdown(
-                    id="prop-prop-x",
-                    value="time",
-                    clearable=False,
-                )
-            ],
-        ),
-        ddk.ControlItem(
-            label="Y-axis",
-            children=[
-                dcc.Dropdown(
-                    id="prop-prop-y",
-                    value="fCO2_recommended",
-                    clearable=False,
-                )
-            ],
-        ),
-        ddk.ControlItem(
-            label="Color By",
-            children=[
-                dcc.Dropdown(
-                    id="prop-prop-colorby",
-                    value="expocode",
-                    clearable=False,
-                )
-            ],
-        ),
-    ]
-    cruise_qc_children = [
-        ddk.CardHeader(
-            id="cruise-qc-card-header",
-            title="Cruise QC for ...",
-        ),
-        dag.AgGrid(
-            id="cruise-qc-grid",
-            dashGridOptions={"pagination": True},
-            columnSize="sizeToFit",
-            defaultColDef={"resizable": True},
-            style={
-                "height": 650,
-                "width": "100%",
-            },
-        ),
-    ]
+
+# Assign the final lists
+header_children = header_children_base
+prop_prop_controls = prop_prop_controls_base
+cruise_qc_children = cruise_qc_children_base
 
 
 def get_layout(
@@ -1074,16 +991,17 @@ def get_layout(
                                                 children=[
                                                     dcc.Loading(
                                                         children=[
-                                                            html.A(
-                                                                id="show",
+                                                            html.Div(style={'display':'flex'}, children=[
+                                                            ddk.Modal(
+                                                                id="show-data-modal",
+                                                                target_id="show-data-card",
+                                                                hide_target=True,
                                                                 children=[
                                                                     html.Button(
                                                                         "Show",
                                                                         id="show-button",
                                                                     )
                                                                 ],
-                                                                href=full_url,
-                                                                target="_blank",
                                                             ),
                                                             html.A(
                                                                 id="csv",
@@ -1091,6 +1009,7 @@ def get_layout(
                                                                     html.Button(
                                                                         "CSV",
                                                                         id="csv-button",
+                                                                        style={'margin-top': '5px', 'margin-right': '5px'}
                                                                     )
                                                                 ],
                                                                 href=full_url,
@@ -1102,20 +1021,42 @@ def get_layout(
                                                                     html.Button(
                                                                         "netCDF",
                                                                         id="netcdf-button",
+                                                                        style={'margin-top': '5px'}
                                                                     )
                                                                 ],
                                                                 href=full_url,
                                                                 target="_blank",
                                                             ),
+                                                        ]),
                                                         ]
                                                     )
+                                                ],
+                                            ),
+                                            ddk.Card(
+                                                id="show-data-card",
+                                                children=[
+                                                    ddk.CardHeader(id='show-data-header', title="Data Table for Cruise"),
+                                                    dag.AgGrid(
+                                                        id="show-data-grid",
+                                                        dashGridOptions={
+                                                            "pagination": True
+                                                        },
+                                                        columnSize="sizeToFit",
+                                                        defaultColDef={
+                                                            "resizable": True
+                                                        },
+                                                        style={
+                                                            "height": "80vh",
+                                                            # "width": "100%",
+                                                        },
+                                                    ),
                                                 ],
                                             ),
                                         ]
                                     ),
                                     ddk.ControlCard(
                                         children=[
-                                            ddk.CardHeader("Expocodes to Plot"),
+                                            ddk.CardHeader("Expocode to Plot"),
                                             dcc.Dropdown(
                                                 id="plot-expocode",
                                                 multi=False,
