@@ -16,13 +16,23 @@ connection_string = "postgresql+pg8000" + os.environ.get(
     "DATABASE_URL", "postgresql://postgres:password@127.0.0.1:5432"
 ).lstrip("postgresql")
 
+# Testing, can be written to:
+# params = {
+#     'host': 'sour.pmel.noaa.gov',
+#     'user': 'scientist_pd',
+#     'password': os.environ['MYSQL_PASSWORD'],
+#     'port': 3306,
+#     'db': 'SOCATv2022_pd',
+#     'charset': 'utf8mb4'
+# }
 
+# Prod, read only at the MySQL side for now.
 params = {
-    'host': 'sour.pmel.noaa.gov',
-    'user': 'scientist_pd',
+    'host': 'smokey.pmel.noaa.gov',
+    'user': 'erddap',
     'password': os.environ['MYSQL_PASSWORD'],
     'port': 3306,
-    'db': 'SOCATv2022_pd',
+    'db': 'SOCATv2025',
     'charset': 'utf8mb4'
 }
 
