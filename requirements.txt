@@ -1,6 +1,8 @@
 dash-design-kit
 dash
 gunicorn
+diskcache
+multiprocess
 numpy
 pandas
 colorcet

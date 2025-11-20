@@ -9,6 +9,8 @@ import pprint
 import urllib
 import math
 from io import StringIO
+import diskcache
+from celery import Celery
 
 import colorcet as cc
 from dash import (
@@ -22,6 +24,8 @@ from dash import (
     exceptions,
     html,
     no_update,
+    CeleryManager,
+    DiskcacheManager
 )
 import dash_ag_grid as dag
 import dash_design_kit as ddk
@@ -208,8 +212,19 @@ platform_name_options = []
 for platform_name in sorted(platform_names):
     platform_name_options.append({'value': platform_name, 'label': platform_name})
 
+celery_app = Celery(broker=os.environ.get("REDIS_URL", "redis://127.0.0.1:6379"), backend=os.environ.get("REDIS_URL", "redis://127.0.0.1:6379"))
+if os.environ.get("DASH_ENTERPRISE_ENV") == "WORKSPACE":
+    # For testing...
+    # import diskcache
+    cache = diskcache.Cache("./cache")
+    background_callback_manager = DiskcacheManager(cache)
+else:
+    # For production...
+    background_callback_manager = CeleryManager(celery_app)
+
+
 # Define Dash application structure
-app = Dash(__name__)
+app = Dash(__name__, background_callback_manager=background_callback_manager)
 server = app.server  # expose server variable for Procfile
 
 months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
@@ -1067,7 +1082,7 @@ def set_expo_from_table_click(cell):
         State('platform-name', 'value'),
         State('platform-type', 'value'),
         State('map-info', 'data')
-    ], prevent_initial_call=True
+    ], prevent_initial_call=True, background=True
 )
 def make_table_of_crusies(da_click, mt_in_expocodes, mt_in_start_date, mt_in_end_date, mt_in_woce_water, mt_in_regions, mt_in_investigator, mt_in_valid_data, mt_in_org, mt_in_version, mt_in_qc_flag, mt_in_platform_name, mt_in_platform_type, mt_in_map_info):
     if da_click == "map" or da_click == 'plots':
