@@ -3,6 +3,7 @@ dash
 gunicorn
 diskcache
 multiprocess
+celery
 numpy
 pandas
 colorcet
