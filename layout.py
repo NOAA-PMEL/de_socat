@@ -478,7 +478,7 @@ def get_layout(
     footer_image,
 ):
     layout = ddk.App(
-        show_editor=True,
+        show_editor=False,
         theme=theme,
         children=[
             dcc.Store(id="plot-data-change"),
