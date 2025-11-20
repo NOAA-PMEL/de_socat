@@ -219,7 +219,7 @@ variables, long_names, standard_name, units, v_d_types = dinfo.get_variables()
 variable_options = []
 for var in variables:   
     if var != 'lat_meters' and var != 'lon_meters':
-        variable_options.append({'label':var, 'value': var})
+        variable_options.append({'label':var, 'value': var, 'title': var})
 # DEBUG print('finished info meta')
 start_date, end_date, start_seconds, end_seconds = dinfo.get_times()
 # DEBUG print('finished info times')
@@ -231,14 +231,10 @@ columns_for_WOCE_edits = ["WOCE_CO2_water" ,"WOCE_CO2_atm", "fCO2_recommended", 
 # all columns: expocode,dataset_name,platform_name,platform_type,organization,geospatial_lon_min,geospatial_lon_max,geospatial_lat_min,geospatial_lat_max,time_coverage_start,time_coverage_end,investigators,socat_version,all_region_ids,socat_doi,qc_flag,sample_number,year,month,day,hour,minute,second,longitude,latitude,depth,sal,Temperature_equi,temp,Temperature_atm,Pressure_equi,Pressure_atm,xCO2_water_equi_temp_dry_ppm,xCO2_water_sst_dry_ppm,xCO2_water_equi_temp_wet_ppm,xCO2_water_sst_wet_ppm,pCO2_water_equi_temp,pCO2_water_sst_100humidity_uatm,fCO2_water_equi_uatm,fCO2_water_sst_100humidity_uatm,xCO2_atm_dry_actual,xCO2_atm_dry_interp,pCO2_atm_wet_actual,pCO2_atm_wet_interp,fCO2_atm_wet_actual,fCO2_atm_wet_interp,delta_xCO2,delta_pCO2,delta_fCO2,relative_humidity,specific_humidity,ship_speed,ship_dir,wind_speed_true,wind_speed_rel,wind_dir_true,wind_dir_rel,WOCE_CO2_water,WOCE_CO2_atm,woa_sss,pressure_ncep_slp,fCO2_insitu_from_xCO2_water_equi_temp_dry_ppm,fCO2_insitu_from_xCO2_water_sst_dry_ppm,fCO2_from_pCO2_water_water_equi_temp,fCO2_from_pCO2_water_sst_100humidity_uatm,fCO2_insitu_from_fCO2_water_equi_uatm,fCO2_insitu_from_fCO2_water_sst_100humidty_uatm,fCO2_from_pCO2_water_water_equi_temp_ncep,fCO2_from_pCO2_water_sst_100humidity_uatm_ncep,fCO2_insitu_from_xCO2_water_equi_temp_dry_ppm_woa,fCO2_insitu_from_xCO2_water_sst_dry_ppm_woa,fCO2_insitu_from_xCO2_water_equi_temp_dry_ppm_ncep,fCO2_insitu_from_xCO2_water_sst_dry_ppm_ncep,fCO2_insitu_from_xCO2_water_equi_temp_dry_ppm_ncep_woa,fCO2_insitu_from_xCO2_water_sst_dry_ppm_ncep_woa,fCO2_recommended,fCO2_source,delta_temp,region_id,calc_speed,etopo2,gvCO2,dist_to_land,day_of_year,time,lon360,tmonth,nobs_full,nobs_deci
 # 
 # 
-# This variable by default with have the value "VIEWER"
-# If the environment variable is set and the value is "QC_EDITOR"
-# then the UI will be configured to expose the buttons which allow
-# QC flags and WOCE flags to be set.
-socat_mode = os.environ.get("SOCAT_MODE", "VIEWER")
+
 
 # These callbacks apply to items in the layout that are only present when the QC Editor mode is active
-if socat_mode == "QC_EDITOR":
+if constants.socat_mode == "QC_EDITOR":
     callbacks.register_editor_callbacks(app)
 
 
@@ -1174,7 +1170,7 @@ def make_cruise_tracks(trigger):
         figure = px.line_geo(track_data, lat='latitude', lon='longitude', color='expocode', 
                             hover_data=['expocode', 'time', 'latitude', 'longitude'],
                             )
-        figure.update_traces(line={'width': 5})
+        figure.update_traces(line={'width': 3})
         stat_fig = px.scatter_geo(stations, lat='latitude', lon='longitude', color='expocode', 
                                 hover_data=['expocode', 'time', 'latitude', 'longitude'])
         figure.add_traces(list(stat_fig.select_traces()))

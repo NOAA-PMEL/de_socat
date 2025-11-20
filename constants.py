@@ -6,6 +6,15 @@ import redis
 from sqlalchemy import all_, create_engine, engine
 from sqlalchemy.pool import NullPool
 
+# This variable by default with have the value "VIEWER"
+# If the environment variable is set and the value is "QC_EDITOR"
+# then the UI will be configured to expose the buttons which allow
+# QC flags and WOCE flags to be set.
+socat_mode = os.environ.get("SOCAT_MODE", "VIEWER")
+
+# DEBUG DEBUG DEBUG
+socat_mode = "VIEWER"
+
 
 # Create a SQLAlchemy connection string from the environment variable `DATABASE_URL`
 # automatically created in your dash app when it is linked to a postgres container

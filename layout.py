@@ -4,7 +4,7 @@ import os
 import dash_design_kit as ddk
 from dash import dcc, html
 import dash_ag_grid as dag
-from theme import theme, tabs_styles, tab_style, tab_selected_style
+from theme import theme, tabs_styles, tab_style, tab_selected_style, second_tab_style, second_tab_selected_style
 
 
 plot_config = {"displaylogo": False}
@@ -16,11 +16,8 @@ map_plot_config = {
     "modeBarButtonsToRemove": ["select2d", "lasso2d"],
 }
 
-# This variable by default with have the value "VIEWER"
-# If the environment variable is set and the value is "QC_EDITOR"
-# then the UI will be configured to expose the buttons which allow
-# QC flags and WOCE flags to be set.
-socat_mode = os.environ.get("SOCAT_MODE", "VIEWER")
+
+socat_mode = constants.socat_mode
 
 # Refactored to eliminate repeated code by Gemini
 
@@ -34,7 +31,7 @@ header_children_base = [
 
 # Define base property controls
 prop_prop_controls_base = [
-    ddk.CardHeader("Property-Property Controls"),
+    ddk.CardHeader("Property-Property Controls", style={'width':'10%'}),
     ddk.ControlItem(
         label="X-axis",
         children=[
@@ -905,8 +902,8 @@ def get_layout(
                                         id="table-sub-tab",
                                         label="Table of Selected Cruises",
                                         value="table-sub-tab",
-                                        style=tab_style,
-                                        selected_style=tab_selected_style,
+                                        style=second_tab_style,
+                                        selected_style=second_tab_selected_style,
                                         children=[
                                             ddk.Card(
                                                 children=[
@@ -937,8 +934,8 @@ def get_layout(
                                         id="tracks-sub-tab",
                                         label="Map of Selected Cruises",
                                         value="tracks-sub-tab",
-                                        style=tab_style,
-                                        selected_style=tab_selected_style,
+                                        style=second_tab_style,
+                                        selected_style=second_tab_selected_style,
                                         children=[
                                             ddk.Card(
                                                 style={"height": "86vh"},
@@ -1090,8 +1087,8 @@ def get_layout(
                                                 id="trajectories",
                                                 value="trajectories",
                                                 label="Map of Selected Cruise",
-                                                style=tab_style,
-                                                selected_style=tab_selected_style,
+                                                style=second_tab_style,
+                                                selected_style=second_tab_selected_style,
                                                 children=[
                                                     ddk.Card(
                                                         style={"height": "85vh"},
@@ -1139,9 +1136,9 @@ def get_layout(
                                             dcc.Tab(
                                                 id="prop-prop",
                                                 value="prop-prop-plot",
-                                                label="Property-Propery Plot",
-                                                style=tab_style,
-                                                selected_style=tab_selected_style,
+                                                label="Property-Property Plot",
+                                                style=second_tab_style,
+                                                selected_style=second_tab_selected_style,
                                                 children=[
                                                     ddk.ControlCard(
                                                         id="prop-prop-controls",
@@ -1176,8 +1173,8 @@ def get_layout(
                                                 id="thumbnails-tab",
                                                 value="prop-prop-thumbs",
                                                 label="Thumbnail Plots",
-                                                style=tab_style,
-                                                selected_style=tab_selected_style,
+                                                style=second_tab_style,
+                                                selected_style=second_tab_selected_style,
                                                 children=[
                                                     ddk.Card(
                                                         children=[

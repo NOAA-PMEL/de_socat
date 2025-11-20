@@ -109,11 +109,27 @@ def show_qc():
     return new_qc
 
 
-def delete_all_rows():
-    delete = 'DELETE FROM {};'
-    postgres_engine.execute(delete.format(constants.edits_table))
+def delete_track(track_id):
+    with postgres_engine.connect() as conn:
+        stmt = text(f"DELETE FROM tracks WHERE expocode='{track_id}'")
+        conn.execute(stmt)
 
 
-def drop_edits():
-    delete = 'DROP TABLE {};'
-    postgres_engine.execute(delete.format(constants.edits_table))
+
+def get_track(track_id):
+    df = pd.DataFrame()
+    with postgres_engine.connect() as conn:
+        stmt = f"SELECT * FROM tracks WHERE expocode='{track_id}'"
+        df =  pd.read_sql(
+            stmt, postgres_engine
+        )
+    return df
+
+# def delete_all_rows():
+#     delete = 'DELETE FROM {};'
+#     postgres_engine.execute(delete.format(constants.edits_table))
+
+
+# def drop_edits():
+#     delete = 'DROP TABLE {};'
+#     postgres_engine.execute(delete.format(constants.edits_table))
