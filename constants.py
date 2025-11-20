@@ -12,9 +12,6 @@ from sqlalchemy.pool import NullPool
 # QC flags and WOCE flags to be set.
 socat_mode = os.environ.get("SOCAT_MODE", "VIEWER")
 
-# DEBUG DEBUG DEBUG
-socat_mode = "VIEWER"
-
 
 # Create a SQLAlchemy connection string from the environment variable `DATABASE_URL`
 # automatically created in your dash app when it is linked to a postgres container
