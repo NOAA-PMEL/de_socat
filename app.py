@@ -27,7 +27,8 @@ from dash import (
     html,
     no_update,
     CeleryManager,
-    DiskcacheManager
+    DiskcacheManager,
+    callback_context
 )
 import dash_ag_grid as dag
 import dash_design_kit as ddk
@@ -48,6 +49,7 @@ import redis
 from sdig.erddap.info import Info
 
 
+from sqlalchemy.sql.selectable import NoInit
 import util
 from datetime import datetime
 import callbacks
@@ -458,23 +460,29 @@ def set_up(click_in):
         # Output('show','href'),
         Output('csv','href'),
         Output('netcdf','href'),
-        Output('prop-prop-loading', 'children')
+        Output('prop-prop-loading', 'children'),
+        Output('crossover-expocode', 'options', allow_duplicate=True),
+        Output('crossover-expocode', 'value', allow_duplicate=True),
+        Output('crossover-message', 'children', allow_duplicate=True),
     ],
     [
         Input('plot-expocode', 'value'),
         Input('crossover-expocode', 'value'),
-        
-        Input('prop-prop-x', 'value'),
-        Input('prop-prop-y', 'value'),
-        Input('prop-prop-colorby', 'value'),
     ], prevent_initial_call=True
 )
-def cache_plot_data(in_plot_expocode, in_crossover_expocode, in_prop_prop_x, in_prop_prop_y, in_prop_prop_colorby):
+def cache_plot_data(in_plot_expocode, in_crossover_expocode,):
     logger.debug(f"__cache_plot_data__ ========== checking data cache expocode={in_plot_expocode}")
-    #
-    # We don't care about the value of in_trace_variable, in_prop_prop_x, in_prop_prop_y, or in_prop_prop_colorby
-    # We just want this to fire so that the plots get the singal to update themselves.
-    # The data should already be in the cache, if it happens of have been purged, it will be reloaded before the plot fires.
+
+    ctx = callback_context
+    if ctx.triggered_id == "plot-expocode":
+        message = "Use button to check for crossovers"
+        options = []
+        value = ''
+    else:
+        message = no_update
+        options = no_update
+        value = no_update
+
     expo_con = util.make_con('expocode', in_plot_expocode)
     all_csv_url = f'{full_url}.csv?{to_get}{expo_con}'
     all_nc_url = all_csv_url.replace('csv','ncCF')
@@ -488,12 +496,11 @@ def cache_plot_data(in_plot_expocode, in_crossover_expocode, in_prop_prop_x, in_
         key = str(in_crossover_expocode)
         cache_data_for_key(key)
         new_crossover = True
-    # They might not even be new, but they need to trigger an update
     if new_data or new_crossover:
-        return ['new_data', all_csv_url, all_nc_url, '']
+        return ['new_data', all_csv_url, all_nc_url, '', options, value, message]
     else:
         # return ['no data', full_url, full_url, full_url,'']
-        return ['no', full_url, full_url,'']
+        return ['no', full_url, full_url,'', [], '', 'Use button to check for crossovers.']
 
 
 def cache_data_for_key(key):
@@ -589,7 +596,6 @@ def update_trace(in_change, trace_in_variable, trace_in_expocode, trace_in_cross
         if redis_instance.hexists(str(trace_in_crossover_expocode), FULL_CRUISE_DATA_FIELD_NAME):
             logger.debug('__update_trace__ reading crossover cache')
             cdf = read_cache_for_key(str(trace_in_crossover_expocode))
-            print(cdf)
         else:
             raise exceptions.PreventUpdate
 
