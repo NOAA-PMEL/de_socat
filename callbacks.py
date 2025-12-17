@@ -1,5 +1,6 @@
 from dash import Input, Output, State, no_update
 import constants
+from constants import COLUMNS_FOR_WOCE_EDIT_TABLE_FIELD_NAME
 import json
 from io import StringIO
 import constants
@@ -41,16 +42,16 @@ def register_editor_callbacks(app):
         prevent_initial_call=True
     ) 
     def show_and_save_comments(click, qc_region_value, flag_value, fco2, sop, meta, data, xover, additional_comment, expocode):
-        print('qc flag saved')
+        # DEBUG print('qc flag saved')
         full_comment = ''
         if fco2 is not None and fco2 != 'fco2no':
             full_comment = full_comment + socatQC[fco2]
-            print('added a comment ', full_comment)
+            # DEBUG print('added a comment ', full_comment)
         if sop is not None and sop != 'sopno':
             if len(full_comment) > 0:
                 full_comment = full_comment + socatQC['commentSpacer']
             full_comment = full_comment + socatQC[sop]
-            print('add sop comment ', full_comment)
+            # DEBUG print('add sop comment ', full_comment)
         if meta is not None and meta != 'metano':
             if len(full_comment) > 0:
                 full_comment = full_comment + socatQC['commentSpacer']
@@ -192,11 +193,12 @@ def register_editor_callbacks(app):
         ],
         [
             State('prop-prop-graph', 'selectedData'),
-            State('woce-flag-to-set', 'value')
-        ]
+            State('woce-flag-to-set', 'value'),
+            State('plot-expocode', 'value')
+        ], prevent_initial_call=True
     )
-    def show_selected_points(click, in_points, flag_to_set):
-        all_data_string = redis_instance.hget("cache","plot-data").decode('utf-8')
+    def show_selected_points(click, in_points, flag_to_set, in_plot_expocode):
+        all_data_string = redis_instance.hget(str(in_plot_expocode), COLUMNS_FOR_WOCE_EDIT_TABLE_FIELD_NAME).decode('utf-8')
         all_data_json = json.loads(all_data_string)
         all_data = pd.read_json(StringIO(all_data_json))
         if flag_to_set == 'WOCE_CO2_atm':

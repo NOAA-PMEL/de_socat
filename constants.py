@@ -6,6 +6,17 @@ import redis
 from sqlalchemy import all_, create_engine, engine
 from sqlalchemy.pool import NullPool
 
+TIME_TO_LIVE = 3600 # time to live af an entry in the redis cache
+
+FULL_CRUISE_DATA_FIELD_NAME = 'cruise_data'
+COLUMNS_FOR_WOCE_EDIT_TABLE_FIELD_NAME = 'woce_edit_columns'
+CROSSOVER_DATA_FIELD_NAME = "crossovers"
+TABLE_OF_CRUISES_URL_FIELD_NAME = 'table_of_cruises'
+
+map_title_base = 'Trajectory from the latest SOCAT Decimated Data Set '
+decimated_url = 'https://data.pmel.noaa.gov/socat/erddap/tabledap/socat_v2025_decimated'
+full_url = 'https://data.pmel.noaa.gov/socat/erddap/tabledap/socat_v2025_fulldata'
+
 # This variable by default with have the value "VIEWER"
 # If the environment variable is set and the value is "QC_EDITOR"
 # then the UI will be configured to expose the buttons which allow
@@ -27,6 +38,10 @@ connection_string = "postgresql+pg8000" + os.environ.get(
 # `poolclass=NullPool` prevents the Engine from using any connection more than once. You'll find more info here:
 # https://docs.sqlalchemy.org/en/14/core/pooling.html#using-connection-pools-with-multiprocessing-or-os-fork
 postgres_engine = create_engine(connection_string, poolclass=NullPool)
+
+
+dtype_definitions = {'expocode': 'str', 'organization': 'str', 'investigators': 'str', 'platform_name': 'str', 'platform_type': 'str', 'qc_flag': 'str', 'socat_version': 'str'}
+
 
 water_edit_style = {
                 "green-cell": "params.data.WOCE_CO2_water == 2",

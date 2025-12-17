@@ -1,6 +1,7 @@
 from datetime import date, datetime, timezone
 import hashlib
 import io
+from sys import exception
 import constants
 from itertools import compress
 import json
@@ -11,6 +12,7 @@ import math
 from io import StringIO
 import diskcache
 from celery import Celery
+from crossover import crossover
 
 import colorcet as cc
 from dash import (
@@ -50,6 +52,17 @@ import util
 from datetime import datetime
 import callbacks
 import layout
+
+
+from constants import TIME_TO_LIVE, FULL_CRUISE_DATA_FIELD_NAME, COLUMNS_FOR_WOCE_EDIT_TABLE_FIELD_NAME, CROSSOVER_DATA_FIELD_NAME, TABLE_OF_CRUISES_URL_FIELD_NAME
+from constants import dtype_definitions
+from constants import decimated_url
+from constants import full_url
+
+import logging
+logging.basicConfig(level=logging.WARN)
+logger = logging.getLogger(__name__)
+
 
 redis_instance = constants.redis_instance
 postgres_engine = constants.postgres_engine
@@ -107,7 +120,6 @@ zoom = 1.4
 x_legend = [0.0, .355, .71]
 y_legend = [1.026, 0.815, 0.604, 0.393, 0.18]
 
-dtype_definitions = {'expocode': 'str', 'organization': 'str', 'investigators': 'str', 'platform_name': 'str', 'platform_type': 'str', 'qc_flag': 'str', 'socat_version': 'str'}
 
 # [x-axis, y-axis, color-by]
 thumbnail_pairs = [
@@ -179,9 +191,7 @@ map_width = 1200
 agg_x = 72
 agg_y = 36
 
-map_title_base = 'Trajectory from the latest SOCAT Decimated Data Set '
-decimated_url = 'https://data.pmel.noaa.gov/socat/erddap/tabledap/socat_v2025_decimated'
-full_url = 'https://data.pmel.noaa.gov/socat/erddap/tabledap/socat_v2025_fulldata'
+
 
 edf = pd.read_sql('SELECT * from cruises', con=postgres_engine)
 expos = sorted(list(edf['expocode']))
@@ -228,16 +238,17 @@ app = Dash(__name__, background_callback_manager=background_callback_manager)
 server = app.server  # expose server variable for Procfile
 
 months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-# DEBUG print('starting info query')
+logger.debug('__app startup__ starting info query')
 dinfo = Info(decimated_url)
 variables, long_names, standard_name, units, v_d_types = dinfo.get_variables()
+to_get = ','.join(variables)
 variable_options = []
 for var in variables:   
     if var != 'lat_meters' and var != 'lon_meters':
         variable_options.append({'label':var, 'value': var, 'title': var})
-# DEBUG print('finished info meta')
+logger.debug('__app startup__  finished info meta')
 start_date, end_date, start_seconds, end_seconds = dinfo.get_times()
-# DEBUG print('finished info times')
+logger.debug('__app startup__ finished info times')
 
 columns_for_WOCE_edits = ["WOCE_CO2_water" ,"WOCE_CO2_atm", "fCO2_recommended", "expocode", "time", "longitude", "latitude"]
 
@@ -273,10 +284,11 @@ app.layout = layout.get_layout(initial_expo_options, start_date, end_date, inves
     ],
     [
         Input('plot-qc-level-tabs', 'value'),
-        Input('plot-expocode', 'value')
+        Input('plot-expocode', 'value'),
+        Input('crossover-expocode', 'value')
     ], prevent_initial_call=True
 )
-def show_cruise_qc(click, expocode_to_show):
+def show_cruise_qc(click, expocode_to_show, crossover_expocode):
     if click != 'cruise-qc':
         return [no_update, no_update, no_update]        
     if expocode_to_show is not None and len(expocode_to_show) > 0:
@@ -284,7 +296,10 @@ def show_cruise_qc(click, expocode_to_show):
         columnDefs = []   
         for i in sorted(records.columns, key=str.casefold):
             columnDefs.append({"field": i, "headerName": i, 'wrapText': True, 'autoHeight': True, 'cellStyle': {"lineHeight": "unset"}})
-        return [columnDefs, records.to_dict("records"), f'Cruise QC for {expocode_to_show}']
+        title = f'Cruise QC for {expocode_to_show}'
+        if crossover_expocode is not None and len(crossover_expocode) > 0:
+            title = title  + '  (Crossover information not shown.)'
+        return [columnDefs, records.to_dict("records"), title]
     else:
         df = pd.DataFrame()
         return [[], df.to_dict("records"),'No expocode selected.']
@@ -334,30 +349,30 @@ def set_tab(click):
 
 # )
 # def set_season(jan_sw, feb_sw, mar_sw, apr_sw, may_sw, jun_sw, jul_sw, aug_sw, sep_sw, oct_sw, nov_sw, dec_sw):
-#     print('season change fired ----------------------')
+#     logger.debug('season change fired ----------------------')
 #     checked = [jan_sw, feb_sw, mar_sw, apr_sw, may_sw, jun_sw, jul_sw, aug_sw, sep_sw, oct_sw, nov_sw, dec_sw]
-#     print('checked ----->', checked)
+#     logger.debug('checked ----->', checked)
 #     disabled = [True, True, True, True, True, True, True, True, True, True, True, True]
 #     for i, check in enumerate(checked):
-#         print('checking ', i, ' at = ', checked[i])
+#         logger.debug('checking ', i, ' at = ', checked[i])
 #         past =  (i-1)
 #         future = ((i%12 + 1)%12)
 #         if check:
-#             print('checked set to false', i)
+#             logger.debug('checked set to false', i)
 #             disabled[i] = False            
 #         if checked[past] and not checked[future]:
-#             print('past and not future', i)
+#             logger.debug('past and not future', i)
 #             disabled[i] = False
 #         if not checked[past] and checked[future]:
-#             print('not past and future', i)
+#             logger.debug('not past and future', i)
 #             disabled[i] = False
 #         if check and checked[past] and checked[future]:
-#             print('past and future', i)
+#             logger.debug('past and future', i)
 #             disabled[i] = True
 #     if disabled.count(True) == 12:
 #         disabled = [False, False, False, False, False, False, False, False, False, False, False, False]
-#     print('disabled ----------|', disabled)
-#     print('=-=-=- done --==-=-=-=-')
+#     logger.debug('disabled ----------|', disabled)
+#     logger.debug('=-=-=- done --==-=-=-=-')
 #     return disabled
         
 
@@ -423,7 +438,7 @@ def close_save_qc_entry(click):
     ]
 )
 def set_up(click_in):
-    # DEBUG print('running setup')
+    logger.debug('__set_up__ running setup')
     inv_url = decimated_url + '.csv?investigators&distinct()'
     inv_df = pd.read_csv(inv_url, skiprows=[1])
     investigator_options = []
@@ -439,36 +454,86 @@ def set_up(click_in):
 
 @app.callback(
     [
-        Output('plot-data-change', 'data'),
+        Output('plot-data-change', 'data', allow_duplicate=True),
         # Output('show','href'),
         Output('csv','href'),
         Output('netcdf','href'),
         Output('prop-prop-loading', 'children')
     ],
     [
-        Input('plot-expocode', 'value')
-    ]
+        Input('plot-expocode', 'value'),
+        Input('crossover-expocode', 'value'),
+        
+        Input('prop-prop-x', 'value'),
+        Input('prop-prop-y', 'value'),
+        Input('prop-prop-colorby', 'value'),
+    ], prevent_initial_call=True
 )
-def cache_plot_data(in_plot_expocode):
-    to_get = ','.join(variables)
+def cache_plot_data(in_plot_expocode, in_crossover_expocode, in_prop_prop_x, in_prop_prop_y, in_prop_prop_colorby):
+    logger.debug(f"__cache_plot_data__ ========== checking data cache expocode={in_plot_expocode}")
+    #
+    # We don't care about the value of in_trace_variable, in_prop_prop_x, in_prop_prop_y, or in_prop_prop_colorby
+    # We just want this to fire so that the plots get the singal to update themselves.
+    # The data should already be in the cache, if it happens of have been purged, it will be reloaded before the plot fires.
     expo_con = util.make_con('expocode', in_plot_expocode)
     all_csv_url = f'{full_url}.csv?{to_get}{expo_con}'
     all_nc_url = all_csv_url.replace('csv','ncCF')
-    all_html_url = all_csv_url.replace('csv','htmlTable')
+    new_data = False
+    new_crossover = False
     if in_plot_expocode is not None and len(in_plot_expocode) > 0:
-        if not redis_instance.hexists("cache", str(in_plot_expocode)):
-            url = f'{full_url}.csv?{to_get}&expocode="{in_plot_expocode}"'
-            print(f'caching data from:\n{url}')
-            df = pd.read_csv(url, skiprows=[1])
-            redis_instance.hset('cache', in_plot_expocode, json.dumps(df.to_json()))
-            # DEBUG this is not working
-            # redis version??????
-            # redis_instance.hexpire('cache', 3600, expo)
-        # return ['new_data', all_html_url, all_csv_url, all_nc_url, '']
+        key = str(in_plot_expocode)
+        cache_data_for_key(key)
+        new_data = True
+    if in_crossover_expocode is not None and len(in_crossover_expocode) > 0:
+        key = str(in_crossover_expocode)
+        cache_data_for_key(key)
+        new_crossover = True
+    # They might not even be new, but they need to trigger an update
+    if new_data or new_crossover:
         return ['new_data', all_csv_url, all_nc_url, '']
     else:
         # return ['no data', full_url, full_url, full_url,'']
-        return ['no data', full_url, full_url,'']
+        return ['no', full_url, full_url,'']
+
+
+def cache_data_for_key(key):
+    if not redis_instance.hexists(key, FULL_CRUISE_DATA_FIELD_NAME):
+        url = f'{full_url}.csv?{to_get}&expocode="{key}"'
+        logger.debug(f'__cache_plot_data__ caching data from: {key}')
+        df = pd.read_csv(url, skiprows=[1])
+        redis_instance.hset(key, FULL_CRUISE_DATA_FIELD_NAME, json.dumps(df.to_json()))
+        redis_instance.expire(key, TIME_TO_LIVE)
+        logger.debug(f'__cache_plot_data__ Data for {key} successfull cached.')
+
+
+def read_cache_for_key(key):
+    df_json_string = redis_instance.hget(key, FULL_CRUISE_DATA_FIELD_NAME).decode('utf-8')
+    df = pd.read_json(StringIO(json.loads(df_json_string)), dtype=dtype_definitions)
+    return df
+        
+
+# @app.callback(
+#     [
+#         Output('plot-data-change', 'data', allow_duplicate=True),
+#     ],
+#     [
+#         Input('crossover-expocode', 'value')
+#     ], prevent_initial_call=True
+# )
+# def cache_crossover_data(in_crossover_expocode):
+#     to_get = ','.join(variables)
+#     if in_crossover_expocode is not None and len(in_crossover_expocode):
+#         if not redis_instance.hexists(str(in_crossover_expocode), FULL_CRUISE_DATA_FIELD_NAME):
+#             cross_url = f'{full_url}.csv?{to_get}&expocode="{in_crossover_expocode}"'
+#             cdf =  df = pd.read_csv(cross_url, skiprows=[1])
+#             redis_instance.hset(str(in_crossover_expocode), FULL_CRUISE_DATA_FIELD_NAME, json.dumps(cdf.to_json()))
+#             redis_instance.expire(str(in_crossover_expocode), TIME_TO_LIVE)
+
+#         return ['new_data']
+#     else:
+#         # return ['no data', full_url, full_url, full_url,'']
+#         return ['no data']
+
 
 @app.callback(
     [
@@ -495,31 +560,47 @@ def reset_trace(tab):
     ],
     [
         Input('plot-data-change','data'),
-        Input('trace-variable', 'value')
+        Input('trace-variable', 'value'),
     ],
     [
         State('plot-expocode', 'value'), 
+        State('crossover-expocode', 'value')
     ], prevent_initial_call=True
 )
-def update_trace(in_change, trace_in_variable, trace_in_expocode, ):
+def update_trace(in_change, trace_in_variable, trace_in_expocode, trace_in_crossover_expocode):
     if trace_in_variable is None or len(trace_in_variable) < 1:
         trace_in_variable = 'fCO2_recommended'
-    to_get = ','.join(variables)
     
+    logger.debug('__update_trace__ remaking trace plot')
+
+
     if trace_in_expocode is not None and len(trace_in_expocode) > 0:
-        if redis_instance.hexists('cache', str(trace_in_expocode)):
-            df_json_string = redis_instance.hget('cache', trace_in_expocode).decode('utf-8')
-            df = pd.read_json(StringIO(json.loads(df_json_string)), dtype=dtype_definitions)
+        if redis_instance.hexists(str(trace_in_expocode), FULL_CRUISE_DATA_FIELD_NAME):
+            df = read_cache_for_key(str(trace_in_expocode))
         else:
-            url = f'{full_url}.csv?{to_get}&expocode="{trace_in_expocode}"'            
-            df = pd.read_csv(url, skiprows=[1], dtype=dtype_definitions)
-            redis_instance.hset('cache', str(code), json.dumps(df.to_json()))
-            redis_instance.hexpire('cache', 3600, code)
+            # Wait for the plot-data-change to load the cache
+            raise exceptions.PreventUpdate
     else:
         return [get_blank("Don't see the cruises you expect?<br>Go back and click the Find Cruises button."), no_update]  
 
+    cdf = None
+    if trace_in_crossover_expocode is not None and len(trace_in_crossover_expocode) > 0:
+        logger.debug('__update_trace__ reading crossover cache')
+        if redis_instance.hexists(str(trace_in_crossover_expocode), FULL_CRUISE_DATA_FIELD_NAME):
+            logger.debug('__update_trace__ reading crossover cache')
+            cdf = read_cache_for_key(str(trace_in_crossover_expocode))
+            print(cdf)
+        else:
+            raise exceptions.PreventUpdate
+
     df = df.loc[df[trace_in_variable].notna()]
     if df.shape[0] > 1:
+        title = f'All {trace_in_variable} data from {str(trace_in_expocode)}'
+        if cdf is not None:
+            cdf = cdf.loc[cdf[trace_in_variable].notna()]
+            if cdf.shape[0] > 1:
+                df = pd.concat([df, cdf])
+                title = title + f' and {trace_in_crossover_expocode}'
         rmin = df[trace_in_variable].min()
         rmax = df[trace_in_variable].max()
         figure = px.scatter_geo(df,
@@ -531,15 +612,39 @@ def update_trace(in_change, trace_in_variable, trace_in_expocode, ):
                                 range_color=[rmin,rmax], custom_data=['expocode'],)
         figure.update_traces(marker={'size':6})
         figure.update_coloraxes(colorbar={'orientation':'v', 'title_side':'right'})
+        figure.update_layout(legend={'xanchor':'left', 'x': 0})
         figure.update_geos(fitbounds='locations', lonaxis_range=[-180,180], lataxis_range=[-90,90])
         figure.update_geos(showland=True, coastlinecolor='black', coastlinewidth=1, landcolor='tan', resolution=50)
+
+        if cdf is not None:
+            if redis_instance.hexists(str(trace_in_expocode), CROSSOVER_DATA_FIELD_NAME):
+                crosses_json_string = redis_instance.hget(str(trace_in_expocode), CROSSOVER_DATA_FIELD_NAME)
+                crosses = json.loads(crosses_json_string)
+                crossing_lat = crosses[trace_in_crossover_expocode]['crossing_lat']
+                crossing_lon = crosses[trace_in_crossover_expocode]['crossing_lon']
+                # Add a cross at the crossover
+                figure.add_trace(
+                    go.Scattergeo(
+                    lat=[crossing_lat],
+                    lon=[crossing_lon],
+                    mode="markers",
+                    name='Crossover',
+                    marker=dict(
+                        symbol="x", # Set the marker symbol to 'x'
+                        line_color="black",
+                        color="grey",
+                        line_width=2,
+                        opacity=0.5,
+                        size=16,         
+                    ),
+                    hoverinfo="name" # Only show the name on hover for this point
+                )
+        )
         # figure.update_coloraxes(colorbar={'orientation':'h', 'thickness':20, 'y': -.175, 'title': None})
-        title = f'All {trace_in_variable} data from {str(trace_in_expocode)}'
     else:
         figure = get_blank(f'No data found for {trace_in_variable}.')
         title = f'No data found for {trace_in_variable}.'
-    #DEBUG
-    print(f'returning value from trace of {trace_in_expocode}')
+    logger.debug(f'__update_trace__ returning value from trace of {trace_in_expocode}')
     return [figure, title]
     
 
@@ -593,15 +698,15 @@ map_info,
 region_id
 ):
     map_type = 'geo'
-    # DEBUG print('\n\nfiring update map')
+    logger.debug('__update_map__ firing update map')
     if ctx.triggered_id == 'top_tab_value' and top_tab_value != 'map':
-        # DEBUG print(f'not updating map {ctx.triggered_id} and {top_tab_value}')
+        logger.debug(f'__update_map__  not updating map {ctx.triggered_id} and {top_tab_value}')
         return no_update
 
     try:
         df = pd.read_sql('SELECT * from map_counts', con=postgres_engine)
     except Exception as e:
-        print(e)
+        logger.error(e)
         figure = go.Figure(go.Scattergeo())
         figure.update_layout(margin={'t':25, 'b':25, 'l':0, 'r':0})
         figure.update_geos(showland=True, coastlinecolor='black', coastlinewidth=1, landcolor='tan', resolution=50)
@@ -613,7 +718,7 @@ region_id
     mask_trace = None
     filtered_df = pd.DataFrame()
     if region_id is not None and len(region_id) > 0:
-        # DEBUG print(f'using region_id of {region_id}')
+        logger.debug(f'__update_map__ using region_id of {region_id}')
         filtered_df = df.loc[df['region_id'].isin(region_id)]
     else:
         if map_info is not None and len(map_info) > 0:
@@ -647,7 +752,7 @@ region_id
         figure.update_traces(marker=dict(size=7), selected_marker_color='green' )
         figure.update_layout(title=title, uirevision='x9999')
         if mask_trace is not None:
-            # DEBUG print('adding mask')
+            logger.debug('__update_map__ adding mask')
             figure.add_traces(list(mask_trace.select_traces()))
     else:
         figure = px.scatter_map(df, lat='latitude', lon='longitude', color='fCO2_recommended', 
@@ -679,18 +784,7 @@ region_id
             modebar_orientation='v',
         )
 
-    # expos_mapped = df['expocode'].unique()
-    # map_summary = f' {len(expos_mapped)} cruises shown on the map.'
-    # map_expo_options = []
 
-    # expos_mapped = sorted(expos_mapped)
-    # for code in expos_mapped:
-    #     map_expo_options.append({'value': code, 'label': code})
-
-    # print(f'dumping {len(map_expo_options)} to redis cache')
-    # redis_instance.hset("cache", "expocodes", json.dumps(expos_mapped))
-    # redis_instance.hset("cache", "expocode_options",json.dumps(map_expo_options))
-    # return [figure, title + map_summary + plot_summary + subselection_summary, False]
     return [figure, '', False]
 
 def get_map_ranges(df):
@@ -724,7 +818,7 @@ def get_map_ranges(df):
         # Output('ur_lat', 'value'),
         # Output('ur_lon', 'value'),
         Output('map-info', 'data'),
-        Output('region', 'value')
+        Output('region', 'value'),
     ],
     [
         Input('map-graph','selectedData')
@@ -732,9 +826,9 @@ def get_map_ranges(df):
 )
 def selectData(selectData):
     # DEBUG 
-    # print('-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-')
-    # print(selectData)
-    # print('-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-')
+    logger.debug('-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-')
+    logger.debug(f"__selectData__ {selectData}")
+    logger.debug('-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-')
     map_info = None
     
     if selectData is not None and 'range' in selectData:
@@ -750,13 +844,12 @@ def selectData(selectData):
                 'latitude': float(f'{geo_range[0][1]:.2f}')
             }
         }
-        redis_instance.hset('cache', 'current_selection', json.dumps(selectData))
     # This is either changing to the whole globe or a selected region. Reset the region menu to nothing in either case.
     if map_info is None:
         raise exceptions.PreventUpdate
     else:
         # return [map_info['ll']['latitude'], map_info['ll']['longitude'], map_info['ur']['latitude'], map_info['ur']['longitude'], json.dumps(map_info), '']
-        return[json.dumps(map_info), '']
+        return [json.dumps(map_info), '']
 
 
 @app.callback(
@@ -778,25 +871,21 @@ def show_cruise(click, plot_in_expocode, plot_data_store):
         raise exceptions.PreventUpdate
 
     if plot_data_store == 'no':
-        # DEBUG print('no new data')
+        logger.debug('no new data')
         raise exceptions.PreventUpdate
     
     
     if plot_in_expocode is not None and len(plot_in_expocode) > 0:
-        print('showing data for ' + plot_in_expocode)
-        if redis_instance.hexists('cache', str(plot_in_expocode)):
-            df_json_string = redis_instance.hget('cache', plot_in_expocode).decode('utf-8')
-            df = pd.read_json(StringIO(json.loads(df_json_string)), dtype=dtype_definitions)
+        logger.debug('__show_cruise__ showing data for ' + plot_in_expocode)
+        if redis_instance.hexists(str(plot_in_expocode), FULL_CRUISE_DATA_FIELD_NAME):
+            df = read_cache_for_key(str(plot_in_expocode))
         else:
-            url = f'{full_url}.csv?{to_get}&expocode="{plot_in_expocode}"'            
-            df = pd.read_csv(url, skiprows=[1], dtype=dtype_definitions)
-            redis_instance.hset('cache', str(code), json.dumps(df.to_json()),)
-            redis_instance.hexpire('cache', 3600, code)
+            raise exceptions.PreventUpdate
         df.dropna(axis=1, how='all', inplace=True)
         columnDefs = []
         for column in df.columns:
              columnDefs.append({'field': column, 'headerName': column})
-        print('returning data for cruise')
+        logger.debug('__show_cruise__ returning data for cruise')
         return [columnDefs, df.to_dict("records"), f'Data for {plot_in_expocode}']
 
     else:
@@ -816,19 +905,19 @@ def show_cruise(click, plot_in_expocode, plot_data_store):
 def set_platform_code_from_map(in_click):
     out_expocode = None
     # DEBUG 
-    print('=-=-=-=-=- starting set_platform_code_from_map =-=-=-=-=-=')
-    print('printing click')
-    print(str(in_click))
+    # print('=-=-=-=-=- starting set_platform_code_from_map =-=-=-=-=-=')
+    # print('printing click')
+    # print(str(in_click))
     if in_click is not None:
-        # DEBUG print('getting first point')
+        logger.debug('getting first point')
         fst_point = in_click['points'][0]
-        # DEBUG print(fst_point)
+        logger.debug(fst_point)
         if 'customdata' in fst_point:
             out_value = fst_point['customdata'][0]
-            # DEBUG print('expo to add because of click ' + out_value)
-            # DEBUG print('existing expo ' + str(state_in_expovalue))
+            logger.debug('expo to add because of click ' + out_value)
+            logger.debug('existing expo ' + str(state_in_expovalue))
         else:
-            # DEBUG print('no custom data in click')
+            logger.debug('no custom data in click')
             raise exceptions.PreventUpdate
         return [out_value, 'plots', 'prop-prop-plot']
 
@@ -846,39 +935,55 @@ def set_platform_code_from_map(in_click):
         Input('prop-prop-colorby', 'value'),
     ],
     [
+
         State('plot-expocode', 'value'),
- 
+        State('crossover-expocode', 'value'),
     ], prevent_initial_call=True
 )
-def make_property_property(plot_data_store, in_prop_prop_x, in_prop_prop_y, in_prop_prop_colorby, plot_in_expocode,):
+def make_property_property(plot_data_store, in_prop_prop_x, in_prop_prop_y, in_prop_prop_colorby, plot_in_expocode, plot_in_crossover_expocode):
     in_map_variable = 'fCO2_recommended'
-    to_get = '.'.join(variables)
     x_label = None
     y_label = None
     legend_title = None
-    # DEBUG print('updating the property-propery plot ' + str(plot_in_expocode))
+    logger.debug('_make_property_property_ updating the property-propery plot ' + str(plot_in_expocode))
 
     if plot_in_expocode is None or len(plot_in_expocode) == 0:
-        # DEBUG print('data-plot: no expo')
+        logger.debug('_make_property_property_ data-plot: no expo')
         return [get_blank('Choose an expocode from the menu at right.'), 'No expocode selected.']
     if in_map_variable is None or len(in_map_variable) == 0:
-        # DEBUG print('data-plot: no variable')
+        logger.debug('_make_property_property_ data-plot: no variable')
         raise exceptions.PreventUpdate
     if plot_data_store == 'no':
-        # DEBUG print('no new data')
+        logger.debug('no new data')
         raise exceptions.PreventUpdate
-    
     if plot_in_expocode is not None and len(plot_in_expocode) > 0:
-        if redis_instance.hexists('cache', str(plot_in_expocode)):
-            df_json_string = redis_instance.hget('cache', plot_in_expocode).decode('utf-8')
-            df = pd.read_json(StringIO(json.loads(df_json_string)), dtype=dtype_definitions)
+        card_title = f'{in_prop_prop_y} vs {in_prop_prop_x} colored by {in_prop_prop_colorby} from {plot_in_expocode}'
+        key = str(plot_in_expocode)
+        if redis_instance.hexists(key, FULL_CRUISE_DATA_FIELD_NAME):
+            df = read_cache_for_key(key)
         else:
-            url = f'{full_url}.csv?{to_get}&expocode="{plot_in_expocode}"'            
-            df = pd.read_csv(url, skiprows=[1], dtype=dtype_definitions)
-            redis_instance.hset('cache', str(code), json.dumps(df.to_json()),)
-            redis_instance.hexpire('cache', 3600, code)
+            return exceptions.PreventUpdate
+        plot_data = df[columns_for_WOCE_edits]
+        redis_instance.hset(str(plot_in_expocode), COLUMNS_FOR_WOCE_EDIT_TABLE_FIELD_NAME, json.dumps(plot_data.to_json()))
+        redis_instance.expire(str(plot_in_expocode), TIME_TO_LIVE)
+        crosses = None
+        if plot_in_crossover_expocode is not None and len(plot_in_crossover_expocode) > 0:
+            card_title = card_title + f' and {plot_in_crossover_expocode}'
+            if redis_instance.hexists(str(plot_in_expocode), FULL_CRUISE_DATA_FIELD_NAME):
+                cdf = read_cache_for_key(str(plot_in_crossover_expocode))
+                if cdf.shape[0] > 0:
+                    df = pd.concat([df, cdf])
+            else:
+                raise exceptions.PreventUpdate
+
+            if redis_instance.hexists(str(plot_in_expocode), CROSSOVER_DATA_FIELD_NAME):
+                crosses_json_string = redis_instance.hget(str(plot_in_expocode), CROSSOVER_DATA_FIELD_NAME)
+                crosses = json.loads(crosses_json_string)
+                
+                
     else:
         return [get_blank('Select an expocode form the menu.'), no_update] 
+
 
     if df.shape[0] < 1:
         raise exceptions.PreventUpdate
@@ -892,8 +997,8 @@ def make_property_property(plot_data_store, in_prop_prop_x, in_prop_prop_y, in_p
     else:
         cmap = px.colors.qualitative.Dark24
 
-    print('making property-property-plot')
-    card_title = f'{in_prop_prop_y} vs {in_prop_prop_x} colored by {in_prop_prop_colorby} from {plot_in_expocode}'
+    logger.debug('_make_property_property_ making property-property-plot')
+
     figure = px.scatter(df,
                         x=in_prop_prop_x,
                         y=in_prop_prop_y,
@@ -906,10 +1011,49 @@ def make_property_property(plot_data_store, in_prop_prop_x, in_prop_prop_y, in_p
                         color_continuous_scale=px.colors.sequential.Viridis,
         )
 
-
+    if crosses:
+        if in_prop_prop_x == "time":
+            crossing_date_time = crosses[plot_in_crossover_expocode]['crossing_date']
+            logger.debug(crossing_date_time)
+            crossing_time = datetime.fromisoformat(crossing_date_time)
+            crossing_time.replace(tzinfo=timezone.utc)
+            logger.debug(crossing_time.tzinfo)
+            logger.debug('_make_property_property_ time in millis', crossing_time.timestamp()*1000)
+            # Adding a collapsed shape instead of a vline works.
+            figure.add_shape(
+                type="line",
+                xref="x",
+                yref="paper", # 'paper' makes the line span the entire height (0 to 1) of the plot area
+                x0=crossing_time.isoformat(), # Pass as an unambiguous string
+                y0=0,
+                x1=crossing_time.isoformat(),
+                y1=1,
+                line=dict(
+                    color="black",
+                    width=2,
+                    dash="dash",
+                ),
+            )
+            figure.add_annotation(
+                x=crossing_time.isoformat(),
+                y=1, # Position at the top (relative to paper yref)
+                xref="x",
+                yref="paper",
+                text=f"Crossover Time = {crossing_time.isoformat()}",
+                showarrow=False,
+                # yshift=-15,
+                xshift=135
+            )
+            # vline adds the line using local time instead of utc
+            # figure.add_vline(
+            #     x=crossing_time.timestamp()*1000,  # formatted date string and datetime object give errors, this is place at local time instead of UTC
+            #     line_width=3, 
+            #     line_dash="dash", 
+            #     line_color="black",
+            #     annotation_text=f"  Crossover Time = {crossing_date_time}", # Optional: adds an annotation label
+            #     annotation_position="top right"
+            # )
     figure.update_layout(margin={'t': 40})
-    plot_data = df[columns_for_WOCE_edits]
-    redis_instance.hset("cache", "plot-data", json.dumps(plot_data.to_json()))
     return[figure, card_title]
 
 
@@ -924,34 +1068,39 @@ def make_property_property(plot_data_store, in_prop_prop_x, in_prop_prop_y, in_p
     ],
     [
         State('plot-expocode', 'value'),
+        State('crossover-expocode', 'value')
  
     ], prevent_initial_call=True
 )
-def make_thumbnails(plot_data_store, plot_in_expocode,):
-    #DEBUG print(f'plot type from tab {in_plot_type}')
-    to_get = '.'.join(variables)
+def make_thumbnails(plot_data_store, plot_in_expocode, plot_in_crossover_expocode):
 
-    # DEBUG print('updating the thumbnail plots ' + str(plot_in_expocode))
+    logger.debug('_make_thumbnails_ updating the thumbnail plots ' + str(plot_in_expocode))
 
     if plot_in_expocode is None or len(plot_in_expocode) == 0:
-        # DEBUG print('data-plot: no expo')
+        logger.debug('_make_thumbnails_ data-plot: no expo')
         return [get_blank('Choose an expocode from the menu.'), 'No expocode seledcted.']
 
     if plot_data_store == 'no':
-        # DEBUG print('no new data')
+        logger.debug('no new data')
         raise exceptions.PreventUpdate
     
+
+    card_title = ""
     if plot_in_expocode is not None and len(plot_in_expocode) > 0:
-        if redis_instance.hexists('cache', str(plot_in_expocode)):
-            df_json_string = redis_instance.hget('cache', plot_in_expocode).decode('utf-8')
-            df = pd.read_json(StringIO(json.loads(df_json_string)))
+        card_title = f'Property Property Thumbnails for {plot_in_expocode}'
+        if redis_instance.hexists(str(plot_in_expocode), FULL_CRUISE_DATA_FIELD_NAME):
+            df = read_cache_for_key(str(plot_in_expocode))
         else:
-            url = f'{full_url}.csv?{to_get}&expocode="{plot_in_expocode}"'            
-            df = pd.read_csv(url, skiprows=[1])
-            redis_instance.hset('cache', str(code), json.dumps(df.to_json()))
-            redis_instance.hexpire('cache', 3600, code)
+            logger.debug('_make_thumbnails_ cache hit failed -=-=-=-=-=-=-=-=-=-=-')
+            raise exceptions.PreventUpdate
+
     else:
         return [get_blank('Select an expocode form the menu.'), no_update] 
+
+    crosses = None
+    if plot_in_crossover_expocode is not None and len(plot_in_crossover_expocode) > 0:
+        card_title = card_title + '  (Crossover data is not shown in the thumbnail plots.)'
+
 
     if df.shape[0] < 1:
         print('No data to plot')
@@ -962,7 +1111,7 @@ def make_thumbnails(plot_data_store, plot_in_expocode,):
 
     cmap = px.colors.qualitative.Light24
 
-    card_title = f'Property Property Thumbnails for {plot_in_expocode}'
+    
     plots = []
     subplot_titles = []
 
@@ -1024,8 +1173,7 @@ def make_thumbnails(plot_data_store, plot_in_expocode,):
             i = i + 1
 
     figure.update_layout(height=image_height, margin=dict( l=80, r=80, b=80, t=80, ))
-    # DEBUG print('returning figure and title')
-    # DEBUG print(figure)
+    logger.debug('returning figure and title')
     return[figure, card_title]
 
 
@@ -1042,7 +1190,7 @@ def make_thumbnails(plot_data_store, plot_in_expocode,):
 def set_expo_from_table_click(cell):
     # DEBUG 
     if cell is not None:
-        print(f"clicked on cell value:  {cell['value']}, column:   {cell['colId']}, row index:   {cell['rowIndex']}")
+        logger.debug(f"clicked on cell value:  {cell['value']}, column:   {cell['colId']}, row index:   {cell['rowIndex']}")
         if cell['colId'] == 'prop':
             return [cell['value'], 'plots', 'prop-prop-plot',]
         elif cell['colId'] == 'thumbnails':
@@ -1064,6 +1212,10 @@ def set_expo_from_table_click(cell):
         Output('plot-expocode', 'value'),
         Output('make-cruise-tracks', 'data'),
         Output('track-data-loading', 'children'),
+        Output('crossover-expocode', 'options', allow_duplicate=True),
+        Output('crossover-expocode', 'value', allow_duplicate=True),
+        Output('crossover-message', 'children', allow_duplicate=True),
+        Output('cruise_table_url', 'data')
     ],
     [
         Input('top-level-tabs', 'value')
@@ -1086,7 +1238,7 @@ def set_expo_from_table_click(cell):
 )
 def make_table_of_crusies(da_click, mt_in_expocodes, mt_in_start_date, mt_in_end_date, mt_in_woce_water, mt_in_regions, mt_in_investigator, mt_in_valid_data, mt_in_org, mt_in_version, mt_in_qc_flag, mt_in_platform_name, mt_in_platform_type, mt_in_map_info):
     if da_click == "map" or da_click == 'plots':
-        return [no_update, no_update, no_update, no_update, no_update, no_update]
+        return [no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update]
     vars_to_get = ['expocode', 'platform_name',	'platform_type', 'investigators', 'qc_flag', 'socat_version']
     valid_con = ''
     if mt_in_valid_data is not None and len(mt_in_valid_data)>0:
@@ -1113,7 +1265,7 @@ def make_table_of_crusies(da_click, mt_in_expocodes, mt_in_start_date, mt_in_end
         url = url + cons['lat'] + cons['lon']
     url = url + '&distinct()'
     expo_options = []
-    print('table URL: ' + url)
+    logger.debug('table URL: ' + url)
     try:
         # dtype to make sure the expocode is a string and does not drop the leading 0
         df = pd.read_csv(url, skiprows=[1], dtype=dtype_definitions)
@@ -1144,6 +1296,10 @@ def make_table_of_crusies(da_click, mt_in_expocodes, mt_in_start_date, mt_in_end
         {'field': 'socat_version', 'headerName': 'SOCAT Version'}
     ]  
 
+    encoded_url = url.encode('utf-8')
+    # Create a SHA-256 hash object
+    hash_object = hashlib.sha256(encoded_url)
+    hash_digest = hash_object.hexdigest()
     if df.shape[0] > 0:
         expos = sorted(list(df['expocode']))
         for code in expos:
@@ -1151,13 +1307,14 @@ def make_table_of_crusies(da_click, mt_in_expocodes, mt_in_start_date, mt_in_end
         expo_value = expos[0]
         # Cache the table so we can extract the version number when/if we go to save a QC entry
         # and so we can make a map from the locations database
-        redis_instance.hset('cache', 'table-of-cruises', json.dumps(df.to_json()))
-        return [df.to_dict("records"), table_of_cruises_columnDefs, expo_options, expo_value, 'go', '']
+        # TODO how to make this unique (with a hash of the URL)
+        redis_instance.hset(hash_digest, TABLE_OF_CRUISES_URL_FIELD_NAME, json.dumps(df.to_json()))
+        return [df.to_dict("records"), table_of_cruises_columnDefs, expo_options, expo_value, 'go', '', [], '', 'Use button to check for crossovers.', hash_digest]
     else:
         df = pd.DataFrame(columns=['no_data'])
-        redis_instance.hset('cache', 'table-of-cruises', json.dumps(df.to_json()))
+        redis_instance.hset('no_data', 'table-of-cruises', json.dumps(df.to_json()))
         tcd = [{'field': 'no_data', 'headerName': 'No matching cruises found...'}]
-        return [df.to_dict("records"), tcd, {}, '', 'go', '']
+        return [df.to_dict("records"), tcd, {}, '', 'go', '', [], '', 'Use button to check for crossovers.', hash_digest]
 
 
 @app.callback(
@@ -1167,10 +1324,13 @@ def make_table_of_crusies(da_click, mt_in_expocodes, mt_in_start_date, mt_in_end
     ],
     [
         Input('make-cruise-tracks', 'data')
+    ],
+    [
+        State('cruise_table_url', 'data')
     ], prevent_initial_call = True
 )
-def make_cruise_tracks(trigger):
-    track_list_string = redis_instance.hget('cache', 'table-of-cruises').decode('utf-8')
+def make_cruise_tracks(trigger, hash_digest):
+    track_list_string = redis_instance.hget(hash_digest, TABLE_OF_CRUISES_URL_FIELD_NAME).decode('utf-8')
     crusies_to_track = pd.read_json(StringIO(json.loads(track_list_string)), dtype=dtype_definitions)
     if crusies_to_track.shape[0] > 0:
         expos = list(crusies_to_track['expocode'].unique())
@@ -1248,36 +1408,49 @@ def set_bounds_from_region(region_id):
         if isinstance(region_id, list):
             region_id = region_id[0]
         map_info = constants.regions[region_id]
-        # DEBUG print(map_info)
+        logger.debug(map_info)
     if map_info is None:
         raise exceptions.PreventUpdate
     else:
-        # DEBUG print(f'fired the single region {region_id} and {map_info}')
+        logger.debug(f'fired the single region {region_id} and {map_info}')
         return [json.dumps(map_info)]
         # return [map_info['ll']['latitude'], map_info['ll']['longitude'], map_info['ur']['latitude'], map_info['ur']['longitude'], json.dumps(map_info),]
 
 
+@app.callback(
+    [
+        Output("crossover-expocode", "options"),
+        Output('crossover-message', "children")
+    ],
+    [
+        Input("check-crossovers", "n_clicks")
+    ],
+    [
+        State("plot-expocode", "value")
+    ], prevent_initial_call=True, background=True
+)
+def check_crossovers(button_click, plot_expo):
+    options = []
+    message = "No crossovers found."
+    if plot_expo is not None:
+        if redis_instance.hexists(str(plot_expo), CROSSOVER_DATA_FIELD_NAME):
+            crosses_json_string = redis_instance.hget(str(plot_expo), CROSSOVER_DATA_FIELD_NAME)
+            crosses = json.loads(crosses_json_string)
+        else:
+            crosses = crossover("expocode", plot_expo, constants.decimated_url)
+        if crosses:
+            options = []
+            for cross in crosses:
+                options.append({"label": cross, "value": cross})
+            if len(options) == 1:
+                message = f"{str(len(options))} crossover found."
+            else:
+                message = f"{str(len(options))} crossovers found."
 
+            redis_instance.hset(plot_expo, CROSSOVER_DATA_FIELD_NAME, json.dumps(crosses))
+            redis_instance.expire(str(plot_expo), TIME_TO_LIVE)
 
-
-
-
-
-
-# @app.callback(
-#     [
-#         Output('prop-prop-x-item', 'style'),
-#         Output('prop-prop-y-item', 'style'),
-#         Output('prop-prop-colorby-item', 'style')
-#     ],
-#     [
-#         Input('plot-type', 'value')
-#     ]
-# )
-# def set_prop_prop_display(in_plot_type):
-#     if in_plot_type is not None and in_plot_type == "prop-prop":
-#         return [{'display': 'block'}, {'display': 'block'}, {'display':'block'}]
-#     return [{'display':'none'}, {'display':'none'}, {'display':'none'}]
+    return [options, message]
 
 
 @app.callback(
@@ -1340,7 +1513,7 @@ def limit_map_zoom(relayout_data, figure):
 
         current_zoom_scale = relayout_data['geo.projection.scale']
 
-        print(f'limiting if {current_zoom_scale} is outside min {min_zoom_scale} and max {max_zoom_scale}')
+        logger.debug( f'limiting if {current_zoom_scale} is outside min {min_zoom_scale} and max {max_zoom_scale}')
 
         current_lon = relayout_data.get('geo.center.lon')
         current_lat = relayout_data.get('geo.center.lat')

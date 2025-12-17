@@ -483,7 +483,9 @@ def get_layout(
         children=[
             dcc.Store(id="plot-data-change"),
             dcc.Store(id="map-info"),
+            dcc.Store(id='map-selected-date'),
             dcc.Store(id="make-cruise-tracks"),
+            dcc.Store(id="cruise_table_url"),
             html.Div(id="kick", style={"visibility": "none"}),
             ddk.Header(children=header_children),
             woce_edits_card,
@@ -1059,6 +1061,28 @@ def get_layout(
                                                 multi=False,
                                                 clearable=False,
                                             ),
+                                        ]
+                                    ),
+                                    ddk.ControlCard(
+                                        children=[
+                                            html.Button(id="check-crossovers", children=["Check for Crossovers"])
+                                        ]
+                                    ),
+                                    ddk.ControlCard(
+                                        children=[
+                                            ddk.CardHeader("Crossover to Plot"),
+                                            dcc.Loading(
+                                                dcc.Dropdown(
+                                                    id="crossover-expocode",
+                                                    multi=False,
+                                                    clearable=True,
+                                                ),
+                                            )
+                                        ]
+                                    ),
+                                    ddk.Card(
+                                        children=[
+                                            html.P(id="crossover-message", children="Use button to check for crossovers.")
                                         ]
                                     ),
                                     ddk.Card(

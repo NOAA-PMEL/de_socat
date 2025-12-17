@@ -69,7 +69,7 @@ def get_cruise_qc(expocode):
                         order by q.qc_time
                         '''
         qc_query = qc_query.format(expocode)
-        print(qc_query)
+        # DEBUG print(qc_query)
         qc_records = pd.read_sql(qc_query, connection)
         return qc_records
 
