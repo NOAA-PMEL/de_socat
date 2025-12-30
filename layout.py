@@ -25,7 +25,8 @@ socat_mode = constants.socat_mode
 # Define a base header
 header_children_base = [
     ddk.Logo(
-        src="https://www.socat.info/wp-content/uploads/2017/06/cropped-socat_cat.png"
+        src="https://www.socat.info/wp-content/uploads/2017/06/cropped-socat_cat.png",
+        style={'width': '110px'}
     ),
     ddk.Title("Surface Ocean CO\u2082 Atlas Data Viewer"),
     ddk.Block(width=1, style={'max-width':'450px'}, children=[
