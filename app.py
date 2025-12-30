@@ -290,7 +290,7 @@ grid_dataset_titles = {
 }
 
 # Read from a file until the data sets are in an accesible ERDDAP
-grids = pd.read_csv("allDatasets.csv", skiprows=[1])
+grids = pd.read_csv("http://smokey.pmel.noaa.gov:8140/erddap/tabledap/allDatasets.csv", skiprows=[1])
 
 grids = grids.loc[grids['title'].str.contains('SOCAT', na=False)]
 for row_num, row in grids.iterrows():
@@ -380,8 +380,7 @@ def set_grid_datasets(in_socat_release):
         for idx, dataset in enumerate(datasets):
             if idx == 0:
                 first_dataset = dataset
-            only_one = not (dataset == 'v2025_c716_f8c7_183a') # DEBUG
-            first_dataset = 'v2025_c716_f8c7_183a' # DEBUG
+            only_one = not ('v2025' in dataset) # DEBUG
             socat_dataset_options.append({'label': datasets[dataset], 'value': dataset, 'disabled': only_one}) # disabled is for DEBUG
         return [socat_dataset_options, first_dataset]
     else:
@@ -391,7 +390,9 @@ def set_grid_datasets(in_socat_release):
     [
         Output('grid-variable', 'options'),
         Output('grid-year', 'options'),
-        Output('grid-year-end', 'options')
+        Output('grid-year-end', 'options'),
+        Output('grid-month', 'style'),
+        Output('grid-month-end', 'style')
     ],
     [
         Input('grid-dataset', 'value')
@@ -410,9 +411,18 @@ def get_grid_variables(in_grid_dataset):
         end_date_object = datetime.strptime(end_date, short_format)
         syear = start_date_obj.year
         eyear = end_date_object.year
-        for y in range(syear, eyear+1):
+        if 'decadal' in in_grid_dataset:
+            stride = 10
+            show_month = {'display': 'none'}
+        elif 'year' in in_grid_dataset:
+            show_month = {'display': 'none'}
+            stride = 1
+        else:
+            show_month = {'display': ''}
+            stride = 1
+        for y in range(syear, eyear+1, stride):
             year_options.append({'label': y, 'value': y})
-    return [grid_variable_options, year_options, year_options]
+    return [grid_variable_options, year_options, year_options, show_month, show_month]
 
 #### CURRENT ATTEMPT AT SAVE IMPLEMENTATION
 @app.callback(
@@ -438,13 +448,19 @@ def get_grid_variables(in_grid_dataset):
     ]
 )
 def grid_map(in_dataset, in_variable, in_year, in_month, in_aggregate_on, in_year_end, in_month_end, in_agg_type, in_dataset_choices,):
-    if in_dataset is None or in_variable is None or in_year is None or in_month is None:
+    if in_dataset is None or in_variable is None or in_year is None:
+        logger.debug('__grid_map__ : no update because None input required input')
+        return no_update
+    elif 'month' in in_dataset and in_month is None:
+        logger.debug('__grid_map__ : no update because no month for monthly dataset')
         return no_update
     else:
         # e.g. http://smokey.pmel.noaa.gov:8140/erddap/griddap/v2025_c716_f8c7_183a.csv?fco2_ave_unwtd[(2007-06-16):1:(2007-06-16)][(-89.5):1:(89.5)][(-179.5):1:(179.5)]
         # encoded: http://smokey.pmel.noaa.gov:8140/erddap/griddap/v2025_c716_f8c7_183a.csv?sst_ave_unwtd%5B(2011-04-16):1:(2011-04-16)%5D%5B(-89.5):1:(89.5)%5D%5B(-179.5):1:(179.5)%5D
         url = f"{grid_url}/{in_dataset}"
         ds = xr.open_dataset(url)
+        if in_month is None:
+            in_month = '06'
         selected_time = f"{in_year}-{in_month}-16"
         if not in_aggregate_on:
             csv_url = f"{url}.csv?{in_variable}" + urllib.parse.quote(f"[({selected_time}):1:({selected_time})][(-89.5):1:(89.5)][(-179.5):1:(179.5)]")
@@ -463,9 +479,15 @@ def grid_map(in_dataset, in_variable, in_year, in_month, in_aggregate_on, in_yea
             dataset_name = dataset_name[0]
             title = f'{in_variable} for {in_year}-{in_month} from {dataset_name}'
         else:
-            if in_year_end is None or in_month_end is None or in_agg_type is None:
+            if in_year_end is None or in_agg_type is None:
+                logger.debug('__grid_map__ : no update on aggregate in time because no year or agg_type')
                 raise exceptions.PreventUpdate
+            elif 'month' in in_dataset and in_month_end is None:
+                logger.debug('__grid_map__ : no update on aggregate in time because no month for monthly dataset')
+                return no_update
             else:
+                if in_month_end is None:
+                    in_month_end = '06'
                 netcdf_url = ''
                 csv_url = ''
                 grid_data_key = 'NOT SET'
