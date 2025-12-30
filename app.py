@@ -1143,8 +1143,6 @@ def show_grid(grid_click, in_grid_data_key):
         if redis_instance.hexists(str(in_grid_data_key), CURRENT_GRID_DATA):
             df_json_string = redis_instance.hget(in_grid_data_key, CURRENT_GRID_DATA).decode('utf-8')
             df = pd.read_json(StringIO(json.loads(df_json_string)), convert_dates=['time']) # TODO type definitions?
-            print('data frame to grid table:')
-            print(df)
             columnDefs = []
             for column in df.columns:
                 columnDefs.append({'field': column, 'headerName': column})

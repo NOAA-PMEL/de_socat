@@ -1380,6 +1380,26 @@ def get_layout(
                                     ])
                                 ])
                             ]),
+                            # Hidden card for show data dialog
+                            ddk.Card(id="grid-show-data-card",
+                                children=[
+                                    ddk.CardHeader(id='grid-show-data-header', title="Data Table for Gridded Summary"),
+                                    dag.AgGrid(
+                                        id="grid-show-data-grid",
+                                        dashGridOptions={
+                                            "pagination": True
+                                        },
+                                        columnSize="sizeToFit",
+                                        defaultColDef={
+                                            "resizable": True
+                                        },
+                                        style={
+                                            "height": "80vh",
+                                            # "width": "100%",
+                                        },
+                                    ),
+                                ]
+                            ),
                         ]),
                     ]),
                 ]),
@@ -1387,26 +1407,6 @@ def get_layout(
                     dcc.Loading(ddk.CardHeader(id='grid-title')),
                     ddk.Graph(id='grid-map', style={'height':'95%', 'width': '95%'})
                 ]),
-                    ddk.Card(
-                        id="grid-show-data-card",
-                        children=[
-                            ddk.CardHeader(id='grid-show-data-header', title="Data Table for Gridded Summary"),
-                            dag.AgGrid(
-                                id="grid-show-data-grid",
-                                dashGridOptions={
-                                    "pagination": True
-                                },
-                                columnSize="sizeToFit",
-                                defaultColDef={
-                                    "resizable": True
-                                },
-                                style={
-                                    "height": "80vh",
-                                    # "width": "100%",
-                                },
-                            ),
-                        ],
-                    ),
             ]),
             ddk.Footer(
                 children=[
