@@ -13,6 +13,9 @@ from io import StringIO
 import diskcache
 from celery import Celery
 from crossover import crossover
+import xarray as xr
+import cf_xarray
+import re
 
 import colorcet as cc
 from dash import (
@@ -56,13 +59,11 @@ import callbacks
 import layout
 
 
-from constants import TIME_TO_LIVE, FULL_CRUISE_DATA_FIELD_NAME, COLUMNS_FOR_WOCE_EDIT_TABLE_FIELD_NAME, CROSSOVER_DATA_FIELD_NAME, TABLE_OF_CRUISES_URL_FIELD_NAME
-from constants import dtype_definitions
-from constants import decimated_url
-from constants import full_url
+from constants import TIME_TO_LIVE, FULL_CRUISE_DATA_FIELD_NAME, COLUMNS_FOR_WOCE_EDIT_TABLE_FIELD_NAME, CROSSOVER_DATA_FIELD_NAME, TABLE_OF_CRUISES_URL_FIELD_NAME, CURRENT_GRID_DATA
+from constants import dtype_definitions, short_format, decimated_url, full_url, grid_url
 
 import logging
-logging.basicConfig(level=logging.WARN)
+logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 
@@ -255,6 +256,49 @@ logger.debug('__app startup__ finished info times')
 columns_for_WOCE_edits = ["WOCE_CO2_water" ,"WOCE_CO2_atm", "fCO2_recommended", "expocode", "time", "longitude", "latitude"]
 
 
+socat_release_options = [
+    {'label': 'SOCAT v2025', 'value':'v2025'},
+    {'label': 'SOCAT v2024', 'value':'v2024', 'disabled': True},
+    {'label': 'SOCAT v2023', 'value':'v2023', 'disabled': True},
+    {'label': 'SOCAT v2022', 'value':'v2022', 'disabled': True},
+    {'label': 'SOCAT v2021', 'value':'v2021', 'disabled': True},
+    {'label': 'SOCAT v2020', 'value':'v2020', 'disabled': True},
+    {'label': 'SOCAT v2019', 'value':'v2019', 'disabled': True},
+    {'label': 'SOCAT v6', 'value':'v6', 'disabled': True},
+    {'label': 'SOCAT v5', 'value':'v5', 'disabled': True},
+    {'label': 'SOCAT v4', 'value':'v4', 'disabled': True},
+    {'label': 'SOCAT v3', 'value':'v3', 'disabled': True},
+    {'label': 'SOCAT v2', 'value':'v2', 'disabled': True},
+    {'label': 'SOCAT v1.5', 'value':'v1.5', 'disabled': True},
+
+]
+grid_dataset_options=[]
+grid_dataset_titles = {
+    'v2025': {},
+    'v2024': {},
+    'v2023': {},
+    'v2022': {},
+    'v2021': {},
+    'v2020': {},
+    'v2019': {},
+    'v6': {},
+    'v5': {},
+    'v4': {},
+    'v3': {},
+    'v2': {},
+    'v1.5': {},
+}
+
+# Read from a file until the data sets are in an accesible ERDDAP
+grids = pd.read_csv("allDatasets.csv", skiprows=[1])
+
+grids = grids.loc[grids['title'].str.contains('SOCAT', na=False)]
+for row_num, row in grids.iterrows():
+    for release in grid_dataset_titles.keys():
+        match = re.search(rf'\b{re.escape(release.lower())}\b', row['title'].lower())
+        if match is not None:
+            grid_dataset_titles[release].update({row['datasetID']: row['title']})
+    grid_dataset_options.append({'label': row['title'], 'value': row['datasetID']})
 
 # all columns: expocode,dataset_name,platform_name,platform_type,organization,geospatial_lon_min,geospatial_lon_max,geospatial_lat_min,geospatial_lat_max,time_coverage_start,time_coverage_end,investigators,socat_version,all_region_ids,socat_doi,qc_flag,sample_number,year,month,day,hour,minute,second,longitude,latitude,depth,sal,Temperature_equi,temp,Temperature_atm,Pressure_equi,Pressure_atm,xCO2_water_equi_temp_dry_ppm,xCO2_water_sst_dry_ppm,xCO2_water_equi_temp_wet_ppm,xCO2_water_sst_wet_ppm,pCO2_water_equi_temp,pCO2_water_sst_100humidity_uatm,fCO2_water_equi_uatm,fCO2_water_sst_100humidity_uatm,xCO2_atm_dry_actual,xCO2_atm_dry_interp,pCO2_atm_wet_actual,pCO2_atm_wet_interp,fCO2_atm_wet_actual,fCO2_atm_wet_interp,delta_xCO2,delta_pCO2,delta_fCO2,relative_humidity,specific_humidity,ship_speed,ship_dir,wind_speed_true,wind_speed_rel,wind_dir_true,wind_dir_rel,WOCE_CO2_water,WOCE_CO2_atm,woa_sss,pressure_ncep_slp,fCO2_insitu_from_xCO2_water_equi_temp_dry_ppm,fCO2_insitu_from_xCO2_water_sst_dry_ppm,fCO2_from_pCO2_water_water_equi_temp,fCO2_from_pCO2_water_sst_100humidity_uatm,fCO2_insitu_from_fCO2_water_equi_uatm,fCO2_insitu_from_fCO2_water_sst_100humidty_uatm,fCO2_from_pCO2_water_water_equi_temp_ncep,fCO2_from_pCO2_water_sst_100humidity_uatm_ncep,fCO2_insitu_from_xCO2_water_equi_temp_dry_ppm_woa,fCO2_insitu_from_xCO2_water_sst_dry_ppm_woa,fCO2_insitu_from_xCO2_water_equi_temp_dry_ppm_ncep,fCO2_insitu_from_xCO2_water_sst_dry_ppm_ncep,fCO2_insitu_from_xCO2_water_equi_temp_dry_ppm_ncep_woa,fCO2_insitu_from_xCO2_water_sst_dry_ppm_ncep_woa,fCO2_recommended,fCO2_source,delta_temp,region_id,calc_speed,etopo2,gvCO2,dist_to_land,day_of_year,time,lon360,tmonth,nobs_full,nobs_deci
 # 
@@ -270,13 +314,196 @@ if constants.socat_mode == "QC_EDITOR":
 footer_image = app.get_asset_url(
     "logo-PMEL-lockup-light_noaaPMEL_horizontal_rgb-txt_2024.png"
 )
-app.layout = layout.get_layout(initial_expo_options, start_date, end_date, investigaors_options, variable_options, organization_options, socat_version_options, platform_name_options, full_url, image_height, footer_image)
+app.layout = layout.get_layout(
+    initial_expo_options, 
+    start_date, 
+    end_date, 
+    investigaors_options, 
+    variable_options, 
+    organization_options, 
+    socat_version_options, 
+    platform_name_options, 
+    full_url, 
+    image_height, 
+    footer_image,
+    grid_dataset_options,
+    socat_release_options
+)
+
+@app.callback(
+    [
+        Output('aggregation-controls', 'style'),
+        Output('aggregation-type', 'style')
+    ],
+    [
+        Input('time-aggregations-switch', 'value')
+    ]
+)
+def toggle_time_aggregation(in_switch):
+    logger.debug(f"__toggle_time_aggregation__: startd with value {in_switch}")
+    if in_switch:
+        return [{'display': ''}, {'display': ''}]
+    else:
+        return [{'display': 'none'}, {'display': 'none'}]
 
 
+@app.callback(
+    [
+        Output('cruise-view', 'style'),
+        Output('grid-view', 'style')
+    ],
+    [
+        Input('viewer', 'value')
+    ], prevent_initial_call=True
+)
+def switch_viewer(in_view):
+    if in_view == "cruises":
+        return [{'display': ''}, {'display': 'none'}]
+    else:
+        return [{'display': 'none'}, {'display': ''}]
 
 
+@app.callback(
+    [
+        Output('grid-dataset', 'options'),
+        Output('grid-dataset', 'value')
+    ],
+    [
+        Input('grid-socat-release', 'value')
+    ]
+)
+def set_grid_datasets(in_socat_release):
+    socat_dataset_options = []
+    first_dataset = ''
+    if in_socat_release is not None and len(in_socat_release) > 0:
+        datasets = grid_dataset_titles[in_socat_release]
+        for idx, dataset in enumerate(datasets):
+            if idx == 0:
+                first_dataset = dataset
+            only_one = not (dataset == 'v2025_c716_f8c7_183a') # DEBUG
+            first_dataset = 'v2025_c716_f8c7_183a' # DEBUG
+            socat_dataset_options.append({'label': datasets[dataset], 'value': dataset, 'disabled': only_one}) # disabled is for DEBUG
+        return [socat_dataset_options, first_dataset]
+    else:
+        raise exceptions.PreventUpdate
+
+@app.callback(
+    [
+        Output('grid-variable', 'options'),
+        Output('grid-year', 'options'),
+        Output('grid-year-end', 'options')
+    ],
+    [
+        Input('grid-dataset', 'value')
+    ], prevent_initial_call=True
+)
+def get_grid_variables(in_grid_dataset):
+    grid_variable_options = []
+    year_options = []
+    if in_grid_dataset is not None and len(in_grid_dataset) > 0:
+        gdInfo = Info(grid_url + '/' + in_grid_dataset)
+        variables, long_names, standard_name, units, v_d_types = gdInfo.get_variables()
+        start_date, end_date, start_date_timestamp, end_date_timestamp = gdInfo.get_times()
+        for var in variables:
+            grid_variable_options.append({'label': long_names[var], 'value': var})
+        start_date_obj = datetime.strptime(start_date, short_format)
+        end_date_object = datetime.strptime(end_date, short_format)
+        syear = start_date_obj.year
+        eyear = end_date_object.year
+        for y in range(syear, eyear+1):
+            year_options.append({'label': y, 'value': y})
+    return [grid_variable_options, year_options, year_options]
 
 #### CURRENT ATTEMPT AT SAVE IMPLEMENTATION
+@app.callback(
+    [
+        Output('grid-title', 'title'),
+        Output('grid-map', 'figure'),
+        Output('grid-netcdf', 'href'),
+        Output('grid-csv', 'href'),
+        Output('grid-data-key', 'data')
+    ],
+    [
+        Input('grid-dataset', 'value'),
+        Input('grid-variable', 'value'),
+        Input('grid-year', 'value'),
+        Input('grid-month', 'value'),
+        Input('time-aggregations-switch', 'value'),
+        Input('grid-year-end', 'value'),
+        Input('grid-month-end', 'value'),
+        Input('aggregation-type', 'value')
+    ],
+    [
+        State('grid-dataset', 'options')
+    ]
+)
+def grid_map(in_dataset, in_variable, in_year, in_month, in_aggregate_on, in_year_end, in_month_end, in_agg_type, in_dataset_choices,):
+    if in_dataset is None or in_variable is None or in_year is None or in_month is None:
+        return no_update
+    else:
+        # e.g. http://smokey.pmel.noaa.gov:8140/erddap/griddap/v2025_c716_f8c7_183a.csv?fco2_ave_unwtd[(2007-06-16):1:(2007-06-16)][(-89.5):1:(89.5)][(-179.5):1:(179.5)]
+        # encoded: http://smokey.pmel.noaa.gov:8140/erddap/griddap/v2025_c716_f8c7_183a.csv?sst_ave_unwtd%5B(2011-04-16):1:(2011-04-16)%5D%5B(-89.5):1:(89.5)%5D%5B(-179.5):1:(179.5)%5D
+        url = f"{grid_url}/{in_dataset}"
+        ds = xr.open_dataset(url)
+        selected_time = f"{in_year}-{in_month}-16"
+        if not in_aggregate_on:
+            csv_url = f"{url}.csv?{in_variable}" + urllib.parse.quote(f"[({selected_time}):1:({selected_time})][(-89.5):1:(89.5)][(-179.5):1:(179.5)]")
+            encoded_url = csv_url.encode('utf-8')
+            hash_object = hashlib.sha256(encoded_url)
+            grid_data_key = hash_object.hexdigest()
+            csv_url = 'http://smokey.pmel.noaa.gov:8140/erddap/griddap/v2025_c716_f8c7_183a.csv?sst_ave_unwtd%5B(2011-04-16):1:(2011-04-16)%5D%5B(-89.5):1:(89.5)%5D%5B(-179.5):1:(179.5)%5D'
+            netcdf_url = csv_url.replace(".csv", ".nc")
+            ds = ds.sel(time=selected_time, method='nearest')
+            df = ds.cf.to_dataframe()
+            df = df.reset_index(level=None, drop=False, inplace=False)
+            df = df.dropna()
+            sdf = df[['time', 'latitude', 'longitude', in_variable]]
+            redis_instance.hset(grid_data_key, CURRENT_GRID_DATA, json.dumps(sdf.to_json()))
+            dataset_name = [x['label'] for x in in_dataset_choices if x['value'] == in_dataset]
+            dataset_name = dataset_name[0]
+            title = f'{in_variable} for {in_year}-{in_month} from {dataset_name}'
+        else:
+            if in_year_end is None or in_month_end is None or in_agg_type is None:
+                raise exceptions.PreventUpdate
+            else:
+                netcdf_url = ''
+                csv_url = ''
+                grid_data_key = 'NOT SET'
+                end_time = f"{in_year_end}-{in_month_end}-16"
+                ds = ds.sel(time=slice(selected_time, end_time))
+                if in_agg_type == 'mean':
+                    ds = ds.mean(dim='time')
+                elif in_agg_type == 'min':
+                    ds = ds.min(dim='time')
+                elif in_agg_type == 'max':
+                    ds = ds.max(dim='time')
+                elif in_agg_type == 'sum':
+                    ds = ds.sum(dim='time')
+                df = ds.cf.to_dataframe()
+                df = df.reset_index(level=None, drop=False, inplace=False)
+                df = df.dropna()
+                if in_agg_type == 'sum':
+                    # drop zeros from sum
+                    df = df[df[in_variable] != 0]
+
+                title = f'{in_agg_type.title()} of {in_variable} from {selected_time} to {end_time}'
+
+        # Calculate the .1 and .9 quantile and use them for the color range rounding down and up to the nearest 5
+        ranges = df[in_variable].quantile(q=[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9])
+        cmax = 5 * round(ranges[0.9] / 5.0)
+        cmin = (ranges[0.1] // 5.0) * 5.0
+        logger.debug(f'color min and max for {in_variable} are {cmin}, {cmax}')
+        figure = px.scatter_geo(df, lat='latitude', lon='longitude', color=in_variable, color_continuous_scale='Inferno', range_color=[cmin, cmax])
+        figure.update_layout(legend={'xanchor':'left', 'x': 0,}, margin={'t':35, 'r':0, 'l':0, 'b':0}, title={'text':title, 'y':.95, 'yanchor':'top'})
+        figure.update_coloraxes(colorbar={'title': in_variable, 'lenmode':'fraction', 'len':.65, 'y':.5, 'orientation':'v', 'title_side':'right'})
+        figure.update_geos(fitbounds='locations', lonaxis_range=[-180,180], lataxis_range=[-90,90])
+        figure.update_geos(showland=True, coastlinecolor='black', coastlinewidth=1, landcolor='tan', resolution=50)
+        # Title is just for the loading indicator
+        return ['', figure, netcdf_url, csv_url, grid_data_key]
+
+
+
+
 
 @app.callback(
     [
@@ -765,7 +992,7 @@ region_id
                                 hover_data=['latitude', 'longitude'], 
                                 hover_name='expocode', color_continuous_scale='Viridis')
         figure.update_traces(marker={'size': marker_size})
-        figure.update_coloraxes(colorbar={'orientation':'v', 'title_side':'right'})
+        figure.update_coloraxes(colorbar={'orientation':'v', 'title_side':'right', })
 
         figure.update_layout(
             showlegend=False,
@@ -865,14 +1092,14 @@ def selectData(selectData):
         Output('show-data-header', 'title')
     ],
     [
-        Input('show-button', 'n_clicks')
+        Input('show-button', 'n_clicks'),
     ],
     [
         State('plot-expocode', 'value'),
-        State('plot-data-change', 'data')
+        State('plot-data-change', 'data'),
     ], prevent_initial_call=True
 )
-def show_cruise(click, plot_in_expocode, plot_data_store):
+def show_cruise_or_grid(click, plot_in_expocode, plot_data_store):
     if plot_in_expocode is None or len(plot_in_expocode) == 0:
         raise exceptions.PreventUpdate
 
@@ -882,7 +1109,7 @@ def show_cruise(click, plot_in_expocode, plot_data_store):
     
     
     if plot_in_expocode is not None and len(plot_in_expocode) > 0:
-        logger.debug('__show_cruise__ showing data for ' + plot_in_expocode)
+        logger.debug('__show_cruise_or_grid__ showing data for ' + plot_in_expocode)
         if redis_instance.hexists(str(plot_in_expocode), FULL_CRUISE_DATA_FIELD_NAME):
             df = read_cache_for_key(str(plot_in_expocode))
         else:
@@ -890,12 +1117,44 @@ def show_cruise(click, plot_in_expocode, plot_data_store):
         df.dropna(axis=1, how='all', inplace=True)
         columnDefs = []
         for column in df.columns:
-             columnDefs.append({'field': column, 'headerName': column})
-        logger.debug('__show_cruise__ returning data for cruise')
+            columnDefs.append({'field': column, 'headerName': column})
+        logger.debug('__show_cruise_or_grid__ returning data for cruise')
         return [columnDefs, df.to_dict("records"), f'Data for {plot_in_expocode}']
 
     else:
-        return [[], {}, 'No cruse found'] 
+        return [[], {}, 'No cruse found']
+   
+
+@app.callback(
+    [
+        Output('grid-show-data-grid', 'columnDefs'),
+        Output('grid-show-data-grid', 'rowData'),
+        Output('grid-show-data-header', 'title')
+    ],
+    [
+        Input('grid-show-button', 'n_clicks')
+    ],
+    [
+        State('grid-data-key', 'data')
+    ], prevent_initial_call=True
+)
+def show_grid(grid_click, in_grid_data_key):
+    if in_grid_data_key is not None and len(in_grid_data_key) > 0:
+        if redis_instance.hexists(str(in_grid_data_key), CURRENT_GRID_DATA):
+            df_json_string = redis_instance.hget(in_grid_data_key, CURRENT_GRID_DATA).decode('utf-8')
+            df = pd.read_json(StringIO(json.loads(df_json_string)), convert_dates=['time']) # TODO type definitions?
+            print('data frame to grid table:')
+            print(df)
+            columnDefs = []
+            for column in df.columns:
+                columnDefs.append({'field': column, 'headerName': column})
+            logger.debug('__show_cruise_or_grid__ returning data for gridded summary')
+            return [columnDefs, df.to_dict("records"), f'Data for gridded summary plot.']
+        else:
+            return [[], {}, 'No gridded data found']
+    else:
+        return [[], {}, 'No gridded data found']
+
 
 
 @app.callback(

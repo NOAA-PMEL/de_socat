@@ -12,10 +12,14 @@ FULL_CRUISE_DATA_FIELD_NAME = 'cruise_data'
 COLUMNS_FOR_WOCE_EDIT_TABLE_FIELD_NAME = 'woce_edit_columns'
 CROSSOVER_DATA_FIELD_NAME = "crossovers"
 TABLE_OF_CRUISES_URL_FIELD_NAME = 'table_of_cruises'
+CURRENT_GRID_DATA = 'grid_data'
+
+short_format = '%Y-%m-%d'
 
 map_title_base = 'Trajectory from the latest SOCAT Decimated Data Set '
 decimated_url = 'https://data.pmel.noaa.gov/socat/erddap/tabledap/socat_v2025_decimated'
 full_url = 'https://data.pmel.noaa.gov/socat/erddap/tabledap/socat_v2025_fulldata'
+grid_url = 'http://smokey.pmel.noaa.gov:8140/erddap/griddap'
 
 # This variable by default with have the value "VIEWER"
 # If the environment variable is set and the value is "QC_EDITOR"

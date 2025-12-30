@@ -1,5 +1,6 @@
 dash-design-kit
 dash
+dash_daq
 gunicorn
 diskcache
 multiprocess
@@ -18,4 +19,7 @@ pg8000
 PyMySQL
 tenacity
 psycopg2-binary==2.9.10
+xarray
+netcdf4
+cf_xarray
 git+https://github.com/noaaroland/sdig.git
