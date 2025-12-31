@@ -473,7 +473,10 @@ def grid_map(in_dataset, in_variable, in_year, in_month, in_aggregate_on, in_yea
             df = ds.cf.to_dataframe()
             df = df.reset_index(level=None, drop=False, inplace=False)
             df = df.dropna()
-            sdf = df[['time', 'latitude', 'longitude', in_variable]]
+            if in_variable not in ['time', 'latitude', 'longitude']:
+                sdf = df[['time', 'latitude', 'longitude', in_variable]]
+            else:
+                sdf = df[['time', 'latitude', 'longitude']]
             redis_instance.hset(grid_data_key, CURRENT_GRID_DATA, json.dumps(sdf.to_json()))
             dataset_name = [x['label'] for x in in_dataset_choices if x['value'] == in_dataset]
             dataset_name = dataset_name[0]
@@ -488,8 +491,8 @@ def grid_map(in_dataset, in_variable, in_year, in_month, in_aggregate_on, in_yea
             else:
                 if in_month_end is None:
                     in_month_end = '06'
-                netcdf_url = ''
-                csv_url = ''
+                netcdf_url = '#'
+                csv_url = '#'
                 grid_data_key = 'NOT SET'
                 end_time = f"{in_year_end}-{in_month_end}-16"
                 ds = ds.sel(time=slice(selected_time, end_time))
@@ -510,12 +513,15 @@ def grid_map(in_dataset, in_variable, in_year, in_month, in_aggregate_on, in_yea
 
                 title = f'{in_agg_type.title()} of {in_variable} from {selected_time} to {end_time}'
 
-        # Calculate the .1 and .9 quantile and use them for the color range rounding down and up to the nearest 5
-        ranges = df[in_variable].quantile(q=[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9])
-        cmax = 5 * round(ranges[0.9] / 5.0)
-        cmin = (ranges[0.1] // 5.0) * 5.0
-        logger.debug(f'color min and max for {in_variable} are {cmin}, {cmax}')
-        figure = px.scatter_geo(df, lat='latitude', lon='longitude', color=in_variable, color_continuous_scale='Inferno', range_color=[cmin, cmax])
+        # Calculate the .1 and .9 quantile and use them for the color range rounding down and up to the nearest 5 for numeric data
+        if is_numeric_dtype(df[in_variable]):
+            ranges = df[in_variable].quantile(q=[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9])
+            cmax = 5 * round(ranges[0.9] / 5.0)
+            cmin = (ranges[0.1] // 5.0) * 5.0
+            logger.debug(f'color min and max for {in_variable} are {cmin}, {cmax}')
+            figure = px.scatter_geo(df, lat='latitude', lon='longitude', color=in_variable, color_continuous_scale='Inferno', range_color=[cmin, cmax])
+        else:
+            figure = px.scatter_geo(df, lat='latitude', lon='longitude', color=in_variable)
         figure.update_layout(legend={'xanchor':'left', 'x': 0,}, margin={'t':35, 'r':0, 'l':0, 'b':0}, title={'text':title, 'y':.95, 'yanchor':'top'})
         figure.update_coloraxes(colorbar={'title': in_variable, 'lenmode':'fraction', 'len':.65, 'y':.5, 'orientation':'v', 'title_side':'right'})
         figure.update_geos(fitbounds='locations', lonaxis_range=[-180,180], lataxis_range=[-90,90])
