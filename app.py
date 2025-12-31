@@ -333,7 +333,8 @@ app.layout = layout.get_layout(
 @app.callback(
     [
         Output('aggregation-controls', 'style'),
-        Output('aggregation-type', 'style')
+        Output('aggregation-type', 'style'),
+        Output('grid-download', 'style')
     ],
     [
         Input('time-aggregations-switch', 'value')
@@ -342,9 +343,9 @@ app.layout = layout.get_layout(
 def toggle_time_aggregation(in_switch):
     logger.debug(f"__toggle_time_aggregation__: startd with value {in_switch}")
     if in_switch:
-        return [{'display': ''}, {'display': ''}]
+        return [{'display': ''}, {'display': ''}, {'display': 'none'}]
     else:
-        return [{'display': 'none'}, {'display': 'none'}]
+        return [{'display': 'none'}, {'display': 'none'}, {'display': ''}]
 
 
 @app.callback(
@@ -491,8 +492,8 @@ def grid_map(in_dataset, in_variable, in_year, in_month, in_aggregate_on, in_yea
             else:
                 if in_month_end is None:
                     in_month_end = '06'
-                netcdf_url = '#'
-                csv_url = '#'
+                netcdf_url = ''
+                csv_url = ''
                 grid_data_key = 'NOT SET'
                 end_time = f"{in_year_end}-{in_month_end}-16"
                 ds = ds.sel(time=slice(selected_time, end_time))
