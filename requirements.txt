@@ -22,4 +22,5 @@ psycopg2-binary==2.9.10
 xarray
 netcdf4
 cf_xarray
+pygeodesy
 git+https://github.com/noaaroland/sdig.git
