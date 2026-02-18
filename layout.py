@@ -831,7 +831,7 @@ def get_layout(
                                                                     "value": "N",
                                                                 },
                                                             ],
-                                                            # value=["Q", "U", "N"]
+                                                            value=constants.qc_flags
                                                         ),
                                                     ]
                                                 ),
