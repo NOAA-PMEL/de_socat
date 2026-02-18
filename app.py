@@ -2,7 +2,6 @@ from datetime import date, datetime, timezone
 import hashlib
 import io
 from sys import exception
-import constants
 from itertools import compress
 import json
 import os
@@ -60,15 +59,11 @@ import layout
 
 
 from constants import TIME_TO_LIVE, FULL_CRUISE_DATA_FIELD_NAME, COLUMNS_FOR_WOCE_EDIT_TABLE_FIELD_NAME, CROSSOVER_DATA_FIELD_NAME, TABLE_OF_CRUISES_URL_FIELD_NAME, CURRENT_GRID_DATA
-from constants import dtype_definitions, short_format, decimated_url, full_url, grid_url
+from constants import dtype_definitions, short_format, decimated_url, full_url, grid_url, socat_mode, redis_instance, postgres_engine, regions, region_names
 
 import logging
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
-
-
-redis_instance = constants.redis_instance
-postgres_engine = constants.postgres_engine
 
 
 def get_blank(message):
@@ -306,7 +301,7 @@ for row_num, row in grids.iterrows():
 
 
 # These callbacks apply to items in the layout that are only present when the QC Editor mode is active
-if constants.socat_mode == "QC_EDITOR":
+if socat_mode == "QC_EDITOR":
     callbacks.register_editor_callbacks(app)
 
 
@@ -1550,7 +1545,11 @@ def make_table_of_crusies(da_click, mt_in_expocodes, mt_in_start_date, mt_in_end
     region_con = util.make_con('region_id', mt_in_regions)
     if region_con:
         vars_to_get.append('region_id')
-    url = decimated_url + '.csv?' + ','.join(vars_to_get) + expo_con + valid_con + region_con + time_con + woce_water_con + investigator_con + org_con + ver_con + qc_flag_con + name_con + platform_type_con + region_con
+
+    base_url = decimated_url
+    if socat_mode == "QC_EDITOR":
+        base_url = full_url
+    url = base_url + '.csv?' + ','.join(vars_to_get) + expo_con + valid_con + region_con + time_con + woce_water_con + investigator_con + org_con + ver_con + qc_flag_con + name_con + platform_type_con + region_con
     if not region_con and mt_in_map_info is not None and len(mt_in_map_info) > 3:
         bounds = json.loads(mt_in_map_info)
         cons = maputil.get_socat_subset(bounds['ll']['longitude'], bounds['ur']['longitude'],bounds['ll']['latitude'],bounds['ur']['latitude'])
@@ -1582,10 +1581,10 @@ def make_table_of_crusies(da_click, mt_in_expocodes, mt_in_start_date, mt_in_end
                     {"field": "CruiseQC", 'headerName': 'CruiseQC', 'cellRenderer': 'myButtonCellRenderer', "autoHeight": True},
                 ]
         },
-        {'field':'investigators', 'headerName': 'Investigators'},
-        {'field': 'platform_name', 'headerName': 'Platform Name'},
-        {'field': 'qc_flag', 'headerName': 'QC Flag'},
-        {'field': 'socat_version', 'headerName': 'SOCAT Version'}
+        {'field':'investigators', 'headerName': 'Investigators', 'filter': True},
+        {'field': 'platform_name', 'headerName': 'Platform Name', 'filter': True},
+        {'field': 'qc_flag', 'headerName': 'QC Flag', 'filter': True},
+        {'field': 'socat_version', 'headerName': 'SOCAT Version', 'filter': True}
     ]  
 
     encoded_url = url.encode('utf-8')
@@ -1699,7 +1698,7 @@ def set_bounds_from_region(region_id):
     if region_id is not None and len(region_id) > 0:
         if isinstance(region_id, list):
             region_id = region_id[0]
-        map_info = constants.regions[region_id]
+        map_info = regions[region_id]
         logger.debug(map_info)
     if map_info is None:
         raise exceptions.PreventUpdate
@@ -1729,7 +1728,7 @@ def check_crossovers(button_click, plot_expo):
             crosses_json_string = redis_instance.hget(str(plot_expo), CROSSOVER_DATA_FIELD_NAME)
             crosses = json.loads(crosses_json_string)
         else:
-            crosses = crossover("expocode", plot_expo, constants.decimated_url)
+            crosses = crossover("expocode", plot_expo, decimated_url)
         if crosses:
             options = []
             for cross in crosses:
