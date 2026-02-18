@@ -16,16 +16,25 @@ CURRENT_GRID_DATA = 'grid_data'
 
 short_format = '%Y-%m-%d'
 
-map_title_base = 'Trajectory from the latest SOCAT Decimated Data Set '
-decimated_url = 'https://data.pmel.noaa.gov/socat/erddap/tabledap/socat_v2025_decimated'
-full_url = 'https://data.pmel.noaa.gov/socat/erddap/tabledap/socat_v2025_fulldata'
-grid_url = 'http://smokey.pmel.noaa.gov:8140/erddap/griddap'
-
 # This variable by default with have the value "VIEWER"
 # If the environment variable is set and the value is "QC_EDITOR"
 # then the UI will be configured to expose the buttons which allow
 # QC flags and WOCE flags to be set.
 socat_mode = os.environ.get("SOCAT_MODE", "VIEWER")
+
+if socat_mode == "VIEWER":
+    map_title_base = 'Trajectory from the latest SOCAT Decimated Data Set '
+    decimated_url = 'https://data.pmel.noaa.gov/socat/erddap/tabledap/socat_v2025_decimated'
+    full_url = 'https://data.pmel.noaa.gov/socat/erddap/tabledap/socat_v2025_fulldata'
+    grid_url = 'http://smokey.pmel.noaa.gov:8140/erddap/griddap'
+    qc_flags = ""
+elif socat_mode == "QC_EDITOR":
+    map_title_base = 'Trajectory from the latest SOCAT Decimated Data Set '
+    decimated_url = 'https://datalocal.pmel.noaa.gov/erddap/tabledap/socat_latest_decimated'
+    full_url = 'https://datalocal.pmel.noaa.gov/erddap/tabledap/socat_latest_fulldata'
+    grid_url = 'http://smokey.pmel.noaa.gov:8140/erddap/griddap'
+    qc_flags = ["Q", "U", "N"]
+
 
 
 # Create a SQLAlchemy connection string from the environment variable `DATABASE_URL`
