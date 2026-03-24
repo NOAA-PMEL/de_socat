@@ -1,5 +1,5 @@
 dash-design-kit
-dash
+dash>=4.1.0
 dash_daq
 gunicorn
 diskcache
