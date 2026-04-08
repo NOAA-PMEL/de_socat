@@ -498,7 +498,7 @@ def get_layout(
             dcc.Store(id="cruise_table_url"),
             dcc.Store(id='grid-data-key'),
             html.Div(id="kick", style={"visibility": "none"}),
-            ddk.Header(content_alignment='left', children=header_children),
+            ddk.Header(content_alignment='left', children=header_children, style={'margin-top': "-50px", 'z-index': '999', 'margin-right':'120px'}),
             woce_edits_card,
             qc_entries_card,
             html.Div(id='cruise-view', children=[

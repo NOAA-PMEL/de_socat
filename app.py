@@ -1,4 +1,5 @@
 from datetime import date, datetime, timezone
+from dash_enterprise_libraries import EnterpriseDash
 import hashlib
 import io
 from sys import exception
@@ -232,8 +233,10 @@ else:
 
 
 # Define Dash application structure
-app = Dash(__name__, background_callback_manager=background_callback_manager)
+app = EnterpriseDash(__name__, background_callback_manager=background_callback_manager)
 server = app.server  # expose server variable for Procfile
+
+app.setup_shortcuts(size='slim', title='', no_url_sharing=False)
 
 months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 logger.debug('__app startup__ starting info query')
