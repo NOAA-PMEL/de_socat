@@ -1855,23 +1855,23 @@ def check_crossovers(button_click, plot_expo):
 
 @app.callback(
     [
-        Output('map-info', 'data', allow_duplicate=True),
-        Output('region', 'value', allow_duplicate=True),
-        Output('woce-co2-water', 'value', allow_duplicate=True),
-        Output('start-date-picker', 'value', allow_duplicate=True),
-        Output('end-date-picker', 'value', allow_duplicate=True),
-        Output('investigator', 'value', allow_duplicate=True),
-        Output('organization', 'value', allow_duplicate=True),
-        Output('socat-version', 'value', allow_duplicate=True),
-        Output('qc-flag', 'value', allow_duplicate=True),
-        Output('platform-name', 'value', allow_duplicate=True),
-        Output('platform-type', 'value', allow_duplicate=True),
-        Output('expocode', 'value'),
-        Output('ll_lat', 'value', allow_duplicate=True),
-        Output('ll_lon', 'value', allow_duplicate=True),
-        Output('ur_lat', 'value', allow_duplicate=True),
-        Output('ur_lon', 'value', allow_duplicate=True),
-        Output('active-constraints', 'children', allow_duplicate=True)
+        Output('map-info', 'data', allow_duplicate=True),                      # 1
+        Output('region', 'value', allow_duplicate=True),                       # 2
+        Output('woce-co2-water', 'value', allow_duplicate=True),               # 3
+        Output('start-date-picker', 'value', allow_duplicate=True),            # 4
+        Output('end-date-picker', 'value', allow_duplicate=True),              # 5
+        Output('investigator', 'value', allow_duplicate=True),                 # 6
+        Output('organization', 'value', allow_duplicate=True),                 # 7
+        Output('socat-version', 'value', allow_duplicate=True),                # 8
+        Output('qc-flag', 'value', allow_duplicate=True),                      # 9
+        Output('platform-name', 'value', allow_duplicate=True),                #10
+        Output('platform-type', 'value', allow_duplicate=True),                #11
+        Output('expocode', 'value'),                                           #12
+        Output('ll_lat', 'value', allow_duplicate=True),                       #13
+        Output('ll_lon', 'value', allow_duplicate=True),                       #14
+        Output('ur_lat', 'value', allow_duplicate=True),                       #15
+        Output('ur_lon', 'value', allow_duplicate=True),                       #16
+        Output('active-constraints', 'children', allow_duplicate=True)         #17
     ],
     [
         Input('reset', 'n_clicks'),
@@ -1880,7 +1880,7 @@ def check_crossovers(button_click, plot_expo):
     ], prevent_initial_call=True
 )
 def reset_map(click, min_date, max_date):
-    return ['', [], [], min_date, max_date, '', '', [], [], [], [], [], -90, -180, 90, 180, []]
+    return [[], [], [], min_date, max_date, [], [], [], [], [], [], [], -90, -180, 90, 180, []]
 
 
 @app.callback(
