@@ -16,6 +16,13 @@ CURRENT_GRID_DATA = 'grid_data'
 
 short_format = '%Y-%m-%d'
 
+zoom = 1
+center = {'lon': 0.0, 'lat': 0.0}
+map_limits = {"west": -180, "east": 180, "south": -89, "north": 89}
+
+map_height = 600
+map_width = 1200
+
 # This variable by default with have the value "VIEWER"
 # If the environment variable is set and the value is "QC_EDITOR"
 # then the UI will be configured to expose the buttons which allow

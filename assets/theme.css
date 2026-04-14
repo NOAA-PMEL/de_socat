@@ -1,3 +1,12 @@
+/*
+Make the header menu float over everything.
+*/
+
+#DashEnterpriseHeader {
+  z-index: 999 !important;
+}
+
+
 /* 
   AG Grid WOCE cell classes
 */

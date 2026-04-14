@@ -24,6 +24,7 @@ from dash import (
     Input,
     Output,
     State,
+    clientside_callback,
     ctx,
     dcc,
     exceptions,
@@ -31,7 +32,8 @@ from dash import (
     no_update,
     CeleryManager,
     DiskcacheManager,
-    callback_context
+    callback_context,
+    clientside_callback
 )
 import dash_ag_grid as dag
 import dash_design_kit as ddk
@@ -61,36 +63,12 @@ import layout
 
 from constants import TIME_TO_LIVE, FULL_CRUISE_DATA_FIELD_NAME, COLUMNS_FOR_WOCE_EDIT_TABLE_FIELD_NAME, CROSSOVER_DATA_FIELD_NAME, TABLE_OF_CRUISES_URL_FIELD_NAME, CURRENT_GRID_DATA
 from constants import dtype_definitions, short_format, decimated_url, full_url, grid_url, socat_mode, redis_instance, postgres_engine, regions, region_names
+from constants import zoom, center, map_limits, map_height, map_width
+from blank import get_blank
 
 import logging
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
-
-
-def get_blank(message):
-    plot_bg = 'rgba(1.0, 1.0, 1.0 ,1.0)'
-    blank_graph = go.Figure(go.Scatter(x=[0, 1], y=[0, 1], showlegend=False))
-    blank_graph.add_trace(go.Scatter(x=[0, 1], y=[0, 1], showlegend=False))
-    blank_graph.update_traces(visible=False)
-    blank_graph.update_layout(
-        height=map_height,
-        xaxis={"visible": False},
-        yaxis={"visible": False},
-        title=message,
-        plot_bgcolor=plot_bg,
-        annotations=[
-            {
-                "text": message,
-                "xref": "paper",
-                "yref": "paper",
-                "showarrow": False,
-                "font": {
-                    "size": 14
-                }
-            },
-        ]
-    )
-    return blank_graph
 
 
 # When there will be more than 50,000 (???) points on the property property panel
@@ -180,13 +158,6 @@ thumbnail_vars = list(set(thumbnail_vars))
 
 ESRI_API_KEY = os.environ.get('ESRI_API_KEY')
 
-zoom = 1
-center = {'lon': 0.0, 'lat': 0.0}
-map_limits = {"west": -180, "east": 180, "south": -89, "north": 89}
-
-map_height = 600
-map_width = 1200
-
 agg_x = 72
 agg_y = 36
 
@@ -236,7 +207,7 @@ else:
 app = EnterpriseDash(__name__, background_callback_manager=background_callback_manager)
 server = app.server  # expose server variable for Procfile
 
-app.setup_shortcuts(size='slim', title='', no_url_sharing=False)
+
 
 months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 logger.debug('__app startup__ starting info query')
@@ -327,6 +298,7 @@ app.layout = layout.get_layout(
     grid_dataset_options,
     socat_release_options
 )
+app.setup_shortcuts(size='slim', title='')
 
 @app.callback(
     [
@@ -384,6 +356,7 @@ def set_grid_datasets(in_socat_release):
         return [socat_dataset_options, first_dataset]
     else:
         raise exceptions.PreventUpdate
+
 
 @app.callback(
     [
@@ -825,10 +798,9 @@ def reset_trace(tab):
     ],
     [
         State('plot-expocode', 'value'), 
-        State('crossover-expocode', 'value')
     ], prevent_initial_call=True
 )
-def update_trace(in_change, trace_in_variable, trace_in_expocode, trace_in_crossover_expocode):
+def update_trace(in_change, trace_in_variable, trace_in_expocode):
     if trace_in_variable is None or len(trace_in_variable) < 1:
         trace_in_variable = 'fCO2_recommended'
     
@@ -844,23 +816,9 @@ def update_trace(in_change, trace_in_variable, trace_in_expocode, trace_in_cross
     else:
         return [get_blank("Don't see the cruises you expect?<br>Go back and click the Find Cruises button."), no_update]  
 
-    cdf = None
-    if trace_in_crossover_expocode is not None and len(trace_in_crossover_expocode) > 0:
-        logger.debug('__update_trace__ reading crossover cache')
-        if redis_instance.hexists(str(trace_in_crossover_expocode), FULL_CRUISE_DATA_FIELD_NAME):
-            logger.debug('__update_trace__ reading crossover cache')
-            cdf = read_cache_for_key(str(trace_in_crossover_expocode))
-        else:
-            raise exceptions.PreventUpdate
-
     df = df.loc[df[trace_in_variable].notna()]
     if df.shape[0] > 1:
         title = f'All {trace_in_variable} data from {str(trace_in_expocode)}'
-        if cdf is not None:
-            cdf = cdf.loc[cdf[trace_in_variable].notna()]
-            if cdf.shape[0] > 1:
-                df = pd.concat([df, cdf])
-                title = title + f' and {trace_in_crossover_expocode}'
         rmin = df[trace_in_variable].min()
         rmax = df[trace_in_variable].max()
         figure = px.scatter_geo(df,
@@ -876,6 +834,96 @@ def update_trace(in_change, trace_in_variable, trace_in_expocode, trace_in_cross
         figure.update_geos(fitbounds='locations', lonaxis_range=[-180,180], lataxis_range=[-90,90])
         figure.update_geos(showland=True, coastlinecolor='black', coastlinewidth=1, landcolor='tan', resolution=50)
 
+    else:
+        figure = get_blank(f'No data found for {trace_in_variable}.')
+        title = f'No data found for {trace_in_variable}.'
+    logger.debug(f'__update_trace__ returning value from trace of {trace_in_expocode}')
+    return [figure, title]
+
+
+
+@app.callback(
+    [
+        Output('crossover-trace-graph', 'figure', allow_duplicate=True),
+        Output('crossover-trace-graph-header', 'title', allow_duplicate=True),
+    ],
+    [
+        Input('plot-data-change','data'),
+        Input('crossover-trace-variable', 'value'),
+    ],
+    [
+        State('plot-expocode', 'value'), 
+        State('crossover-expocode', 'value')
+    ], prevent_initial_call=True
+)
+def update_crossover_trace(in_change, trace_in_variable, trace_in_expocode, trace_in_crossover_expocode):
+    if trace_in_variable is None or len(trace_in_variable) < 1:
+        trace_in_variable = 'fCO2_recommended'
+    
+    return _make_crossover_trace_helper(trace_in_variable, trace_in_expocode, trace_in_crossover_expocode)
+
+
+def _make_crossover_trace_helper(trace_in_variable, trace_in_expocode, trace_in_crossover_expocode, tmin=None, tmax=None):
+    if trace_in_variable is None or len(trace_in_variable) < 1:
+        trace_in_variable = 'fCO2_recommended'
+    
+    logger.debug(f'__make_crossover_trace_helper__ making trace plot with filter {tmin} and {tmax}')
+
+
+    if trace_in_expocode is not None and len(trace_in_expocode) > 0:
+        if redis_instance.hexists(str(trace_in_expocode), FULL_CRUISE_DATA_FIELD_NAME):
+            df = read_cache_for_key(str(trace_in_expocode))
+        else:
+            # Wait for the plot-data-change to load the cache
+            raise exceptions.PreventUpdate
+    else:
+        return [get_blank("Don't see the cruises you expect?<br>Go back and click the Find Cruises button."), no_update]  
+
+    cdf = None
+    if trace_in_crossover_expocode is not None and len(trace_in_crossover_expocode) > 0:
+        logger.debug('__make_crossover_trace_helper__ reading crossover cache')
+        if redis_instance.hexists(str(trace_in_crossover_expocode), FULL_CRUISE_DATA_FIELD_NAME):
+            logger.debug('__make_crossover_trace_helper__ reading crossover cache')
+            cdf = read_cache_for_key(str(trace_in_crossover_expocode))
+        else:
+            raise exceptions.PreventUpdate
+
+    df = df.loc[df[trace_in_variable].notna()]
+    if df.shape[0] > 1:
+        if tmax is not None:
+            df['dt'] = pd.to_datetime(df['time'])
+            df = df.loc[df['dt'] <= tmax]
+            print('after max filter', df.tail())
+        if tmin is not None:
+            df = df.loc[df['dt'] >= tmin]
+            print('after min filter', df.head())
+        title = f'All {trace_in_variable} data from {str(trace_in_expocode)}'
+        if cdf is not None:
+            cdf = cdf.loc[cdf[trace_in_variable].notna()]
+            cdf['dt'] = pd.to_datetime(cdf['time'])
+            if tmax is not None:
+                cdf = cdf.loc[cdf['dt'] <= tmax]
+            if tmin is not None:
+                cdf = cdf.loc[cdf['dt'] >= tmin]
+            if cdf.shape[0] > 1:
+                df = pd.concat([df, cdf])
+                title = title + f' and {trace_in_crossover_expocode}'
+        df['time_str'] = df['time'].astype(str)
+        rmin = df[trace_in_variable].min()
+        rmax = df[trace_in_variable].max()
+        figure = px.scatter_geo(df,
+                                lat='latitude',
+                                lon='longitude',
+                                color=trace_in_variable,
+                                color_continuous_scale='Viridis',
+                                hover_data=['expocode','time','latitude','longitude',trace_in_variable],
+                                range_color=[rmin,rmax], custom_data=['time_str', 'expocode'],)
+        figure.update_traces(marker={'size':6})
+        figure.update_coloraxes(colorbar={'orientation':'v', 'title_side':'right'})
+        figure.update_layout(legend={'xanchor':'left', 'x': 0})
+        figure.update_geos(fitbounds='locations', lonaxis_range=[-180,180], lataxis_range=[-90,90])
+        figure.update_geos(showland=True, coastlinecolor='black', coastlinewidth=1, landcolor='tan', resolution=50)
+
         if cdf is not None:
             if redis_instance.hexists(str(trace_in_expocode), CROSSOVER_DATA_FIELD_NAME):
                 crosses_json_string = redis_instance.hget(str(trace_in_expocode), CROSSOVER_DATA_FIELD_NAME)
@@ -885,29 +933,27 @@ def update_trace(in_change, trace_in_variable, trace_in_expocode, trace_in_cross
                 # Add a cross at the crossover
                 figure.add_trace(
                     go.Scattergeo(
-                    lat=[crossing_lat],
-                    lon=[crossing_lon],
-                    mode="markers",
-                    name='Crossover',
-                    marker=dict(
-                        symbol="x", # Set the marker symbol to 'x'
-                        line_color="black",
-                        color="grey",
-                        line_width=2,
-                        opacity=0.5,
-                        size=16,         
-                    ),
-                    hoverinfo="name" # Only show the name on hover for this point
+                        lat=[crossing_lat],
+                        lon=[crossing_lon],
+                        mode="markers",
+                        name='Crossover',
+                        marker=dict(
+                            symbol="x", # Set the marker symbol to 'x'
+                            line_color="black",
+                            color="grey",
+                            line_width=2,
+                            opacity=0.5,
+                            size=16,         
+                        ),
+                        hoverinfo="name", # Only show the name on hover for this point
+                    )
                 )
-        )
         # figure.update_coloraxes(colorbar={'orientation':'h', 'thickness':20, 'y': -.175, 'title': None})
     else:
         figure = get_blank(f'No data found for {trace_in_variable}.')
         title = f'No data found for {trace_in_variable}.'
-    logger.debug(f'__update_trace__ returning value from trace of {trace_in_expocode}')
+    logger.debug(f'__make_crossover_helper__ returning trace of {trace_in_expocode}')
     return [figure, title]
-    
-
 
 @app.callback(
     [
@@ -1227,10 +1273,9 @@ def set_platform_code_from_map(in_click):
     [
 
         State('plot-expocode', 'value'),
-        State('crossover-expocode', 'value'),
     ], prevent_initial_call=True
 )
-def make_property_property(plot_data_store, in_prop_prop_x, in_prop_prop_y, in_prop_prop_colorby, plot_in_expocode, plot_in_crossover_expocode):
+def make_property_property(plot_data_store, in_prop_prop_x, in_prop_prop_y, in_prop_prop_colorby, plot_in_expocode):
     in_map_variable = 'fCO2_recommended'
     x_label = None
     y_label = None
@@ -1248,6 +1293,80 @@ def make_property_property(plot_data_store, in_prop_prop_x, in_prop_prop_y, in_p
         raise exceptions.PreventUpdate
     if plot_in_expocode is not None and len(plot_in_expocode) > 0:
         card_title = f'{in_prop_prop_y} vs {in_prop_prop_x} colored by {in_prop_prop_colorby} from {plot_in_expocode}'
+        key = str(plot_in_expocode)
+        if redis_instance.hexists(key, FULL_CRUISE_DATA_FIELD_NAME):
+            df = read_cache_for_key(key)
+        else:
+            return exceptions.PreventUpdate
+        plot_data = df[columns_for_WOCE_edits]
+        redis_instance.hset(str(plot_in_expocode), COLUMNS_FOR_WOCE_EDIT_TABLE_FIELD_NAME, json.dumps(plot_data.to_json()))
+        redis_instance.expire(str(plot_in_expocode), TIME_TO_LIVE)
+                
+                
+    else:
+        return [get_blank('Select an expocode form the menu.'), no_update] 
+
+
+    if df.shape[0] < 1:
+        raise exceptions.PreventUpdate
+
+    df['expocode'] = df['expocode'].astype(str)
+    df['WOCE_CO2_water'] = df['WOCE_CO2_water'].astype(str)
+    df['WOCE_CO2_atm'] = df['WOCE_CO2_atm'].astype(str)
+
+    if in_prop_prop_colorby == 'expocode':
+        cmap = px.colors.qualitative.Light24
+    else:
+        cmap = px.colors.qualitative.Dark24
+
+    logger.debug('_make_property_property_ making property-property-plot')
+
+    figure = px.scatter(df,
+                        x=in_prop_prop_x,
+                        y=in_prop_prop_y,
+                        color=in_prop_prop_colorby,
+                        hover_name='expocode',
+                        hover_data=['time',in_prop_prop_x,in_prop_prop_y,in_prop_prop_colorby],
+                        custom_data=['time'],
+                        color_discrete_sequence=cmap,
+                        category_orders={"WOCE_CO2_water": ["2", "3", "4", "5", "1"]},
+                        color_continuous_scale=px.colors.sequential.Viridis,
+        )
+
+    figure.update_layout(margin={'t': 40})
+    return[figure, card_title]
+
+
+@app.callback(
+    [
+        Output('crossover-timeseries', 'figure'),
+    ],
+    [
+        Input('plot-data-change', 'data'),
+        Input('crossover-trace-variable', 'value'),
+    ],
+    [
+
+        State('plot-expocode', 'value'),
+        State('crossover-expocode', 'value'),
+    ], prevent_initial_call=True
+)
+def make_crossover_timeseries(plot_data_store, in_trace_variable, plot_in_expocode, plot_in_crossover_expocode):
+    in_trace_variable = 'fCO2_recommended'
+    legend_title = None
+    logger.debug('_make_property_property_ updating the property-propery plot ' + str(plot_in_expocode))
+
+    if plot_in_expocode is None or len(plot_in_expocode) == 0:
+        logger.debug('_make_crossover_timeseries_ data-plot: no expo')
+        return [get_blank('Choose an expocode from the menu at right.'), 'No expocode selected.']
+    if in_trace_variable is None or len(in_trace_variable) == 0:
+        logger.debug('_make_crossover_timeseries_ data-plot: no variable')
+        raise exceptions.PreventUpdate
+    if plot_data_store == 'no':
+        logger.debug('_make_crossover_timeseries_ no new data')
+        raise exceptions.PreventUpdate
+    if plot_in_expocode is not None and len(plot_in_expocode) > 0:
+        card_title = f'Timeseries of {in_trace_variable} from {plot_in_expocode}'
         key = str(plot_in_expocode)
         if redis_instance.hexists(key, FULL_CRUISE_DATA_FIELD_NAME):
             df = read_cache_for_key(key)
@@ -1281,71 +1400,58 @@ def make_property_property(plot_data_store, in_prop_prop_x, in_prop_prop_y, in_p
     df['expocode'] = df['expocode'].astype(str)
     df['WOCE_CO2_water'] = df['WOCE_CO2_water'].astype(str)
     df['WOCE_CO2_atm'] = df['WOCE_CO2_atm'].astype(str)
+    df['time_str'] = df['time'].astype(str)
+    logger.debug('_make_crossover_timeseries_ making crossover-timeseries plot')
 
-    if in_prop_prop_colorby == 'expocode':
-        cmap = px.colors.qualitative.Light24
-    else:
-        cmap = px.colors.qualitative.Dark24
-
-    logger.debug('_make_property_property_ making property-property-plot')
-
+    # for now no choice of color for plot dots
+    cmap = px.colors.qualitative.Light24
     figure = px.scatter(df,
-                        x=in_prop_prop_x,
-                        y=in_prop_prop_y,
-                        color=in_prop_prop_colorby,
+                        x='time',
+                        y=in_trace_variable,
+                        color='expocode',
                         hover_name='expocode',
-                        hover_data=['time',in_prop_prop_x,in_prop_prop_y,in_prop_prop_colorby],
-                        custom_data=['time'],
+                        hover_data=['time',in_trace_variable, 'expocode'],
+                        custom_data=['time_str', 'time'],
                         color_discrete_sequence=cmap,
                         category_orders={"WOCE_CO2_water": ["2", "3", "4", "5", "1"]},
                         color_continuous_scale=px.colors.sequential.Viridis,
         )
 
     if crosses:
-        if in_prop_prop_x == "time":
-            crossing_date_time = crosses[plot_in_crossover_expocode]['crossing_date']
-            logger.debug(crossing_date_time)
-            crossing_time = datetime.fromisoformat(crossing_date_time)
-            crossing_time.replace(tzinfo=timezone.utc)
-            logger.debug(crossing_time.tzinfo)
-            logger.debug('_make_property_property_ time in millis', crossing_time.timestamp()*1000)
-            # Adding a collapsed shape instead of a vline works.
-            figure.add_shape(
-                type="line",
-                xref="x",
-                yref="paper", # 'paper' makes the line span the entire height (0 to 1) of the plot area
-                x0=crossing_time.isoformat(), # Pass as an unambiguous string
-                y0=0,
-                x1=crossing_time.isoformat(),
-                y1=1,
-                line=dict(
-                    color="black",
-                    width=2,
-                    dash="dash",
-                ),
-            )
-            figure.add_annotation(
-                x=crossing_time.isoformat(),
-                y=1, # Position at the top (relative to paper yref)
-                xref="x",
-                yref="paper",
-                text=f"Crossover Time = {crossing_time.isoformat()}",
-                showarrow=False,
-                # yshift=-15,
-                xshift=135
-            )
-            # vline adds the line using local time instead of utc
-            # figure.add_vline(
-            #     x=crossing_time.timestamp()*1000,  # formatted date string and datetime object give errors, this is place at local time instead of UTC
-            #     line_width=3, 
-            #     line_dash="dash", 
-            #     line_color="black",
-            #     annotation_text=f"  Crossover Time = {crossing_date_time}", # Optional: adds an annotation label
-            #     annotation_position="top right"
-            # )
-    figure.update_layout(margin={'t': 40})
-    return[figure, card_title]
+        crossing_date_time = crosses[plot_in_crossover_expocode]['crossing_date']
+        logger.debug(crossing_date_time)
+        crossing_time = datetime.fromisoformat(crossing_date_time)
+        crossing_time.replace(tzinfo=timezone.utc)
+        logger.debug(crossing_time.tzinfo)
+        logger.debug('_make_property_property_ time in millis', crossing_time.timestamp()*1000)
+        # Adding a collapsed shape instead of a vline works.
+        figure.add_shape(
+            type="line",
+            xref="x",
+            yref="paper", # 'paper' makes the line span the entire height (0 to 1) of the plot area
+            x0=crossing_time.isoformat(), # Pass as an unambiguous string
+            y0=0,
+            x1=crossing_time.isoformat(),
+            y1=1,
+            line=dict(
+                color="black",
+                width=2,
+                dash="dash",
+            ),
+        )
+        figure.add_annotation(
+            x=crossing_time.isoformat(),
+            y=1.09, # Position at the top (relative to paper yref)
+            xref="x",
+            yref="paper",
+            text=f"Crossover Time = {crossing_time.isoformat()}",
+            showarrow=False,
+            # yshift=-15,
+            xshift=135
+        )
 
+    figure.update_layout(margin={'t': 40})
+    return[figure]
 
 
 @app.callback(
@@ -1765,6 +1871,7 @@ def check_crossovers(button_click, plot_expo):
         Output('ll_lon', 'value', allow_duplicate=True),
         Output('ur_lat', 'value', allow_duplicate=True),
         Output('ur_lon', 'value', allow_duplicate=True),
+        Output('active-constraints', 'children', allow_duplicate=True)
     ],
     [
         Input('reset', 'n_clicks'),
@@ -1773,7 +1880,111 @@ def check_crossovers(button_click, plot_expo):
     ], prevent_initial_call=True
 )
 def reset_map(click, min_date, max_date):
-    return ['', [], [], min_date, max_date, '', '', [], [], [], [], [], -90, -180, 90, 180]
+    return ['', [], [], min_date, max_date, '', '', [], [], [], [], [], -90, -180, 90, 180, []]
+
+
+@app.callback(
+    [
+        Output('active-constraints', 'children', allow_duplicate=True),
+        Output('reset', 'style')
+    ],
+    [
+        Input('map-info', 'data'),
+        Input('region', 'value'),
+        Input('woce-co2-water', 'value'),
+        Input('start-date-picker', 'value'),
+        Input('end-date-picker', 'value'),
+        Input('investigator', 'value'),
+        Input('organization', 'value'),
+        Input('socat-version', 'value'),
+        Input('qc-flag', 'value'),
+        Input('platform-name', 'value'),
+        Input('platform-type', 'value'),
+        Input('expocode', 'value'),
+        Input('ll_lat', 'value'),
+        Input('ll_lon', 'value'),
+        Input('ur_lat', 'value'),
+        Input('ur_lon', 'value'),
+    ], prevent_initial_call=True
+)
+def show_active_constraints(
+    in_map_info, 
+    in_region, 
+    in_woce_water, 
+    in_start_date, 
+    in_end_date, 
+    in_investigator, 
+    in_organization, 
+    in_socat_version, 
+    in_qc_flag, 
+    in_platform_name, 
+    in_platform_type, 
+    in_expocode,
+    in_ll_lat,
+    in_ll_lon,
+    in_ur_lat,
+    in_ur_lon):
+    
+    display_elements = []
+    if in_ur_lon:
+        if in_ur_lon != 180:
+            p = html.P(children=f"Longitude is West of {in_ur_lon}")
+            display_elements.append(p)
+    if in_ur_lat:
+        if in_ur_lat != 90:
+            p = html.P(children=f"Latitude is South of {in_ur_lat}")
+            display_elements.append(p)
+    if in_ll_lon:
+        if in_ll_lon != -180:
+            p = html.P(children=f"Longitude is East of {in_ll_lon}")
+            display_elements.append(p)
+    if in_ll_lat:
+        if in_ll_lat != -90:
+            p = html.P(children=f"Latitude is North of {in_ll_lat}")
+            display_elements.append(p)
+    if in_platform_type:
+        p = html.P(children=[f"Platform type is one of {in_platform_type}"])
+        display_elements.append(p)
+    if in_platform_name:
+        p = html.P(children=[f"Platform name is one of {in_platform_name}"])
+        display_elements.append(p)
+    if in_qc_flag:
+        p = html.P(children=[f"QC Flag is one of {in_qc_flag}"])
+        display_elements.append(p)
+    if in_socat_version:
+        p = html.P(children=[f"SOCAT version is one of {in_socat_version}"])
+        display_elements.append(p)
+    if in_organization:
+        p = html.P(children=[f"Organization is {in_organization}"])
+        display_elements.append(p)
+    if in_investigator:
+        p = html.P(children=[f"Investigators match one of {in_investigator}"])
+        display_elements.append(p)
+    if (in_start_date):
+        if in_start_date != start_date:
+            p = html.P(children=[f"Start date: {in_start_date}"])
+            display_elements.append(p)
+    if (in_end_date):
+        if in_end_date != end_date:
+            p = html.P(children=[f"End date: {in_end_date}"])
+            display_elements.append(p)
+    if in_woce_water:
+        p = html.P(children=[f"WOCE Water flag is one of {in_woce_water}"])
+        display_elements.append(p)
+    if in_region:
+        p = html.P(children=[f"Region is one of {in_region}"])
+        display_elements.append(p)
+    if in_expocode:
+        p = html.P(children=[f"Expocodes: {in_expocode}"])
+        display_elements.append(p)
+
+    if len(display_elements) == 0:
+        style = {'background-color': "#7A76FF"}
+        
+    else:
+        style = {'background-color': "#FFD107"}
+        
+    return [html.Div(children=display_elements), style]
 
 
 def cc_color_set(index, palette):
@@ -1832,6 +2043,40 @@ def limit_map_zoom(relayout_data, figure):
             return fig_copy
 
     return no_update
+
+
+@app.callback(
+    Output('crossover-trace-graph', 'figure', allow_duplicate=True),
+    Output('crossover-trace-graph-header', 'title', allow_duplicate=True),
+    Input('crossover-timeseries', 'relayoutData'),
+    Input('plot-data-change','data'),
+    Input('crossover-trace-variable', 'value'),        
+    State('plot-expocode', 'value'), 
+    State('crossover-expocode', 'value'),
+    prevent_initial_call=True
+)
+def filter_crossover_map(timeseries_extents, data_change, trace_in_variable, trace_in_expocode, trace_in_crossover_expocode):
+    if not timeseries_extents:
+        return no_update
+    tmin = None
+    tmax = None
+    if "xaxis.range[0]" in timeseries_extents:
+        tmin = timeseries_extents["xaxis.range[0]"]
+    if "xaxis.range[1]" in timeseries_extents:
+        tmax = timeseries_extents["xaxis.range[1]"]
+    if tmin is not None or tmax is not None:
+        logger.debug(f'__filter_crossover_map__ tmin={tmin} and tmax={tmax}')
+        return _make_crossover_trace_helper(trace_in_variable, trace_in_expocode, trace_in_crossover_expocode, tmin=tmin, tmax=tmax)
+    else:
+        return no_update
+
+
+clientside_callback(
+    "window.dash_clientside.clientside.sync_plots",
+    Output("no-action", "data"),
+    Input("crossover-timeseries", "hoverData"),
+    State("crossover-trace-graph", "id"),
+)
 
 
 if __name__ == '__main__':

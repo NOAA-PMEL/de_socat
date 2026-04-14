@@ -6,6 +6,7 @@ from dash import dcc, html
 import dash_ag_grid as dag
 import dash_daq as daq
 from theme import theme, tabs_styles, tab_style, tab_selected_style, second_tab_style, second_tab_selected_style
+from blank import get_blank
 
 
 plot_config = {"displaylogo": False}
@@ -497,8 +498,9 @@ def get_layout(
             dcc.Store(id="make-cruise-tracks"),
             dcc.Store(id="cruise_table_url"),
             dcc.Store(id='grid-data-key'),
+            dcc.Store(id='no-action'),
             html.Div(id="kick", style={"visibility": "none"}),
-            ddk.Header(content_alignment='left', children=header_children, style={'margin-top': "-50px", 'z-index': '999', 'margin-right':'120px'}),
+            ddk.Header(content_alignment='left', children=header_children, style={'margin-top': "-50px", 'z-index': '999', 'margin-right':'220px', 'border': 0}),
             woce_edits_card,
             qc_entries_card,
             html.Div(id='cruise-view', children=[
@@ -522,19 +524,17 @@ def get_layout(
                                             children=[
                                                 ddk.ControlCard(
                                                     children=[
-                                                        ddk.CardHeader(
-                                                            "Selection Constraints"
-                                                        ),
                                                         dcc.Loading(
                                                             children=[
                                                                 html.Button(
                                                                     id="reset",
                                                                     children=["Reset"],
                                                                     disabled=True,
+                                                                    style={'background-color': "#7A76FF"}
                                                                 ),
                                                                 html.Button(
                                                                     id="search",
-                                                                    style={'margin-left': '5px'},
+                                                                    style={'margin-left': '5px,'},
                                                                     children=[
                                                                         "Find Cruises"
                                                                     ],
@@ -544,6 +544,12 @@ def get_layout(
                                                         ),
                                                     ]
                                                 ),
+                                                ddk.Card(children=[
+                                                     ddk.CardHeader(
+                                                        "Active Constraints"
+                                                    ),
+                                                    ddk.Block(id='active-constraints', style={'font-size':'.8rem', 'line-height': '.85rem'})
+                                                ]),
                                                 ddk.ControlCard(
                                                     children=[
                                                         ddk.CardHeader(
@@ -603,7 +609,7 @@ def get_layout(
                                                                         dcc.Input(
                                                                             id="ll_lat",
                                                                             type="text",
-                                                                            value=90,
+                                                                            value=-90,
                                                                             style={
                                                                                 "width": "12ch"
                                                                             },
@@ -1076,28 +1082,6 @@ def get_layout(
                                                 ),
                                             ]
                                         ),
-                                        ddk.ControlCard(
-                                            children=[
-                                                html.Button(id="check-crossovers", children=["Check for Crossovers"])
-                                            ]
-                                        ),
-                                        ddk.ControlCard(
-                                            children=[
-                                                ddk.CardHeader("Crossover to Plot"),
-                                                dcc.Loading(
-                                                    dcc.Dropdown(
-                                                        id="crossover-expocode",
-                                                        multi=False,
-                                                        clearable=True,
-                                                    ),
-                                                )
-                                            ]
-                                        ),
-                                        ddk.Card(
-                                            children=[
-                                                html.P(id="crossover-message", children="Use button to check for crossovers.")
-                                            ]
-                                        ),
                                         ddk.Card(
                                             id="save-full-message-card",
                                             style={"visibility": "hidden"},
@@ -1263,6 +1247,69 @@ def get_layout(
                                                             children=cruise_qc_children,
                                                         ),
                                                     ],
+                                                ),
+                                                dcc.Tab(
+                                                    id="crossovers",
+                                                    value="crossovers",
+                                                    label="Explore Crossovers",
+                                                    style=second_tab_style,
+                                                    selected_style=second_tab_selected_style,
+                                                    children=[
+                                                        ddk.Block(children=[
+                                                            ddk.ControlCard(width=.3,
+                                                                children=[
+                                                                    ddk.CardHeader(id='crossover-message', children="Click to check for Crossovers"),
+                                                                    html.Button(id="check-crossovers", children=["Check for Crossovers"])
+                                                                ]
+                                                            ),
+                                                            ddk.ControlCard(width=.3,
+                                                                children=[
+                                                                    ddk.CardHeader("Crossover to Plot"),
+                                                                    dcc.Loading(
+                                                                        dcc.Dropdown(
+                                                                            id="crossover-expocode",
+                                                                            multi=False,
+                                                                            clearable=True,
+                                                                        ),
+                                                                    )
+                                                                ]
+                                                            ),
+                                                        ]),
+                                                        ddk.Card(
+                                                            # style={"height": "85vh"},
+                                                            children=[
+                                                                dcc.Loading(
+                                                                    children=[
+                                                                        ddk.CardHeader(
+                                                                            fullscreen=True,
+                                                                            id="crossover-trace-graph-header",
+                                                                            title="Selected Cruise                                       ",
+                                                                            children=[
+                                                                                dcc.Dropdown(
+                                                                                    id="crossover-trace-variable",
+                                                                                    options=variable_options,
+                                                                                    value="fCO2_recommended",
+                                                                                    multi=False,
+                                                                                )
+                                                                            ],
+                                                                        ),
+                                                                    ]
+                                                                ),
+                                                                ddk.Block(width=1., children=[
+                                                                    ddk.Graph(
+                                                                        id="crossover-timeseries",
+                                                                        figure=get_blank('Select a crossover.')
+                                                                    ),
+                                                                ]),
+                                                                ddk.Block(width=1., children=[
+                                                                    ddk.Graph(
+                                                                        id="crossover-trace-graph",
+                                                                        config=map_plot_config,
+                                                                    ),
+                                                                ]),
+                                                            ],
+                                                        )
+                                                    ]
                                                 ),
                                             ],
                                         )
