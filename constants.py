@@ -60,7 +60,7 @@ connection_string = "postgresql+pg8000" + os.environ.get(
 postgres_engine = create_engine(connection_string, poolclass=NullPool)
 
 
-dtype_definitions = {'expocode': 'str', 'organization': 'str', 'investigators': 'str', 'platform_name': 'str', 'platform_type': 'str', 'qc_flag': 'str', 'socat_version': 'str'}
+dtype_definitions = {'expocode': str, 'organization': str, 'investigators': str, 'platform_name': str, 'platform_type': str, 'qc_flag': str, 'socat_version': str}
 
 
 water_edit_style = {

@@ -498,6 +498,7 @@ def get_layout(
             dcc.Store(id="make-cruise-tracks"),
             dcc.Store(id="cruise_table_url"),
             dcc.Store(id='grid-data-key'),
+            dcc.Store(id='crossover-endpoints'),
             dcc.Store(id='no-action'),
             html.Div(id="kick", style={"visibility": "none"}),
             ddk.Header(content_alignment='left', children=header_children, style={'margin-top': "-50px", 'z-index': '999', 'margin-right':'220px', 'border': 0}),
@@ -1302,10 +1303,12 @@ def get_layout(
                                                                     ),
                                                                 ]),
                                                                 ddk.Block(width=1., children=[
-                                                                    ddk.Graph(
-                                                                        id="crossover-trace-graph",
-                                                                        config=map_plot_config,
-                                                                    ),
+                                                                    dcc.Loading(children=[
+                                                                        ddk.Graph(
+                                                                            id="crossover-trace-graph",
+                                                                            config=map_plot_config,
+                                                                        ),
+                                                                    ]),
                                                                 ]),
                                                             ],
                                                         )

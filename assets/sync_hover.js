@@ -8,6 +8,7 @@ window.dash_clientside = Object.assign({}, window.dash_clientside, {
             }
             
             const t = tsHover.points[0].customdata && tsHover.points[0].customdata[0];
+            const e = tsHover.points[0].customdata && tsHover.points[0].customdata[1]; // the expocode
             if (!t) return window.dash_clientside.no_update;
     
             const gd = document.getElementById(mapId);
@@ -25,7 +26,7 @@ window.dash_clientside = Object.assign({}, window.dash_clientside, {
             const pointNumbers = [];
             for (let i = 0; i < trace.customdata.length; i++) {
                 const cd = trace.customdata[i];
-                if (cd && cd[0] === t) pointNumbers.push(i);
+                if ((cd && cd[0] === t) && (cd && cd[1] === e)) pointNumbers.push(i); // both the time and expocode have to match.
             }
     
             if (pointNumbers.length) {
