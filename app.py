@@ -521,7 +521,7 @@ def grid_map(in_dataset, in_variable, in_year, in_month, in_aggregate_on, in_yea
         figure.update_layout(legend={'xanchor':'left', 'x': 0,}, margin={'t':35, 'r':0, 'l':0, 'b':0}, title={'text':title, 'y':.95, 'yanchor':'top'})
         figure.update_coloraxes(colorbar={'title': in_variable, 'lenmode':'fraction', 'len':.65, 'y':.5, 'orientation':'v', 'title_side':'right'})
         figure.update_geos(fitbounds='locations', lonaxis_range=[-180,180], lataxis_range=[-90,90])
-        figure.update_geos(showland=True, coastlinecolor='black', coastlinewidth=1, landcolor='tan', resolution=50)
+        figure.update_geos(coastlinecolor='black', coastlinewidth=1, showocean=True, showland=True, landcolor='tan', oceancolor="#AADAFF", resolution=50)
         # Title is just for the loading indicator
         return ['', figure, netcdf_url, csv_url, grid_data_key]
 
@@ -861,7 +861,7 @@ def update_trace(in_change, trace_in_variable, trace_in_expocode):
         figure.update_coloraxes(colorbar={'orientation':'v', 'title_side':'right'})
         figure.update_layout(legend={'xanchor':'left', 'x': 0})
         figure.update_geos(fitbounds='locations', lonaxis_range=[-180,180], lataxis_range=[-90,90])
-        figure.update_geos(showland=True, coastlinecolor='black', coastlinewidth=1, landcolor='tan', resolution=50)
+        figure.update_geos(coastlinecolor='black', coastlinewidth=1, showland=True, landcolor='tan', showocean=True, oceancolor="#AADAFF", resolution=50)
 
     else:
         figure = get_blank(f'No data found for {trace_in_variable}.')
@@ -965,7 +965,7 @@ def _make_crossover_trace_helper(trace_in_variable, trace_in_expocode, trace_in_
         figure.update_coloraxes(colorbar={'orientation':'v', 'title_side':'right'})
         figure.update_layout(legend={'xanchor':'left', 'x': 0})
         figure.update_geos(fitbounds='locations', lonaxis_range=[-180,180], lataxis_range=[-90,90])
-        figure.update_geos(showland=True, coastlinecolor='black', coastlinewidth=1, landcolor='tan', resolution=50)
+        figure.update_geos(coastlinecolor='black', coastlinewidth=1, resolution=50, showland=True, landcolor='tan', showocean=True, oceancolor="#AADAFF")
 
         if cdf is not None:
             if redis_instance.hexists(str(trace_in_expocode), CROSSOVER_DATA_FIELD_NAME):
@@ -1456,7 +1456,6 @@ def make_crossover_timeseries(plot_data_store, in_trace_variable, plot_in_expoco
     # for now no choice of color for plot dots
     cmap = px.colors.qualitative.Light24
     pd.set_option('display.max_rows', None)
-    print(df.dtypes)
     figure = px.scatter(df,
                         x='time',
                         y=in_trace_variable,
