@@ -2121,6 +2121,11 @@ def filter_crossover_map(timeseries_extents):
         endpoints = {'tmin': tmin, 'tmax': tmax}
         endpoints_s = json.dumps(endpoints)
         return endpoints_s
+    
+    if "xaxis.autorange" in timeseries_extents:
+        endpoints = {'tmin': None, 'tmax': None}
+        endpoints_s = json.dumps(endpoints)
+        return endpoints_s
    
     return no_update
 
