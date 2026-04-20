@@ -501,7 +501,7 @@ def get_layout(
             dcc.Store(id='crossover-endpoints'),
             dcc.Store(id='no-action'),
             html.Div(id="kick", style={"visibility": "none"}),
-            ddk.Header(content_alignment='left', children=header_children, style={'margin-top': "-50px", 'z-index': '999', 'margin-right':'220px', 'border': 0}),
+            ddk.Header(content_alignment='left', children=header_children, ), # style={'margin-top': "-50px", 'z-index': '999', 'margin-right':'220px', 'border': 0}),
             woce_edits_card,
             qc_entries_card,
             html.Div(id='cruise-view', children=[

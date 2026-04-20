@@ -1,5 +1,4 @@
 from datetime import date, datetime, timezone
-from dash_enterprise_libraries import EnterpriseDash
 import hashlib
 import io
 from sys import exception
@@ -226,7 +225,7 @@ else:
 
 
 # Define Dash application structure
-app = EnterpriseDash(__name__, background_callback_manager=background_callback_manager)
+app = Dash(__name__, background_callback_manager=background_callback_manager)
 server = app.server  # expose server variable for Procfile
 
 
@@ -320,7 +319,7 @@ app.layout = layout.get_layout(
     grid_dataset_options,
     socat_release_options
 )
-app.setup_shortcuts(size='slim', title='')
+# app.setup_shortcuts(size='slim', title='')
 
 @app.callback(
     [
