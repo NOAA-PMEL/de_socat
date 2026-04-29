@@ -280,7 +280,7 @@ grid_dataset_titles = {
 }
 
 # Read from a file until the data sets are in an accesible ERDDAP
-grids = pd.read_csv("http://smokey.pmel.noaa.gov:8140/erddap/tabledap/allDatasets.csv", skiprows=[1])
+grids = pd.read_csv("http://hazy.pmel.noaa.gov:8140/erddap/tabledap/allDatasets.csv", skiprows=[1])
 
 grids = grids.loc[grids['title'].str.contains('SOCAT', na=False)]
 for row_num, row in grids.iterrows():
@@ -395,6 +395,7 @@ def set_grid_datasets(in_socat_release):
 def get_grid_variables(in_grid_dataset):
     grid_variable_options = []
     year_options = []
+    show_month = {'display': 'none'}
     if in_grid_dataset is not None and len(in_grid_dataset) > 0:
         gdInfo = Info(grid_url + '/' + in_grid_dataset)
         variables, long_names, standard_name, units, v_d_types = gdInfo.get_variables()
@@ -450,8 +451,8 @@ def grid_map(in_dataset, in_variable, in_year, in_month, in_aggregate_on, in_yea
         logger.debug(f'__{fname}__ : no update because no month for monthly dataset')
         return no_update
     else:
-        # e.g. http://smokey.pmel.noaa.gov:8140/erddap/griddap/v2025_c716_f8c7_183a.csv?fco2_ave_unwtd[(2007-06-16):1:(2007-06-16)][(-89.5):1:(89.5)][(-179.5):1:(179.5)]
-        # encoded: http://smokey.pmel.noaa.gov:8140/erddap/griddap/v2025_c716_f8c7_183a.csv?sst_ave_unwtd%5B(2011-04-16):1:(2011-04-16)%5D%5B(-89.5):1:(89.5)%5D%5B(-179.5):1:(179.5)%5D
+        # e.g. http://hazy.pmel.noaa.gov:8140/erddap/griddap/v2025_c716_f8c7_183a.csv?fco2_ave_unwtd[(2007-06-16):1:(2007-06-16)][(-89.5):1:(89.5)][(-179.5):1:(179.5)]
+        # encoded: http://hazy.pmel.noaa.gov:8140/erddap/griddap/v2025_c716_f8c7_183a.csv?sst_ave_unwtd%5B(2011-04-16):1:(2011-04-16)%5D%5B(-89.5):1:(89.5)%5D%5B(-179.5):1:(179.5)%5D
         url = f"{grid_url}/{in_dataset}"
         ds = xr.open_dataset(url)
         if in_month is None:
@@ -462,7 +463,7 @@ def grid_map(in_dataset, in_variable, in_year, in_month, in_aggregate_on, in_yea
             encoded_url = csv_url.encode('utf-8')
             hash_object = hashlib.sha256(encoded_url)
             grid_data_key = hash_object.hexdigest()
-            csv_url = 'http://smokey.pmel.noaa.gov:8140/erddap/griddap/v2025_c716_f8c7_183a.csv?sst_ave_unwtd%5B(2011-04-16):1:(2011-04-16)%5D%5B(-89.5):1:(89.5)%5D%5B(-179.5):1:(179.5)%5D'
+            csv_url = 'http://hazy.pmel.noaa.gov:8140/erddap/griddap/v2025_c716_f8c7_183a.csv?sst_ave_unwtd%5B(2011-04-16):1:(2011-04-16)%5D%5B(-89.5):1:(89.5)%5D%5B(-179.5):1:(179.5)%5D'
             netcdf_url = csv_url.replace(".csv", ".nc")
             ds = ds.sel(time=selected_time, method='nearest')
             df = ds.cf.to_dataframe()
