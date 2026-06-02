@@ -261,20 +261,20 @@ columns_for_WOCE_edits = ["WOCE_CO2_water" ,"WOCE_CO2_atm", "fCO2_recommended", 
 
 
 socat_release_options = [
-    {'label': 'SOCAT v2025', 'value':'v2025'},
-    {'label': 'SOCAT v2024', 'value':'v2024', 'disabled': True},
-    {'label': 'SOCAT v2023', 'value':'v2023', 'disabled': True},
-    {'label': 'SOCAT v2022', 'value':'v2022', 'disabled': True},
-    {'label': 'SOCAT v2021', 'value':'v2021', 'disabled': True},
-    {'label': 'SOCAT v2020', 'value':'v2020', 'disabled': True},
-    {'label': 'SOCAT v2019', 'value':'v2019', 'disabled': True},
-    {'label': 'SOCAT v6', 'value':'v6', 'disabled': True},
-    {'label': 'SOCAT v5', 'value':'v5', 'disabled': True},
-    {'label': 'SOCAT v4', 'value':'v4', 'disabled': True},
-    {'label': 'SOCAT v3', 'value':'v3', 'disabled': True},
-    {'label': 'SOCAT v2', 'value':'v2', 'disabled': True},
-    {'label': 'SOCAT v1.5', 'value':'v1.5', 'disabled': True},
-
+    {'label': 'Not Yet Implemented', 'value': 'NOT', 'disabled': True},
+    # {'label': 'SOCAT v2025', 'value':'v2025', 'disabled': True},
+    # {'label': 'SOCAT v2024', 'value':'v2024', 'disabled': True},
+    # {'label': 'SOCAT v2023', 'value':'v2023', 'disabled': True},
+    # {'label': 'SOCAT v2022', 'value':'v2022', 'disabled': True},
+    # {'label': 'SOCAT v2021', 'value':'v2021', 'disabled': True},
+    # {'label': 'SOCAT v2020', 'value':'v2020', 'disabled': True},
+    # {'label': 'SOCAT v2019', 'value':'v2019', 'disabled': True},
+    # {'label': 'SOCAT v6', 'value':'v6', 'disabled': True},
+    # {'label': 'SOCAT v5', 'value':'v5', 'disabled': True},
+    # {'label': 'SOCAT v4', 'value':'v4', 'disabled': True},
+    # {'label': 'SOCAT v3', 'value':'v3', 'disabled': True},
+    # {'label': 'SOCAT v2', 'value':'v2', 'disabled': True},
+    # {'label': 'SOCAT v1.5', 'value':'v1.5', 'disabled': True},
 ]
 grid_dataset_options=[]
 grid_dataset_titles = {
@@ -294,15 +294,17 @@ grid_dataset_titles = {
 }
 
 # Read from a file until the data sets are in an accesible ERDDAP
-grids = pd.read_csv("http://hazy.pmel.noaa.gov:8140/erddap/tabledap/allDatasets.csv", skiprows=[1])
+# grids = pd.read_csv("http://hazy.pmel.noaa.gov:8140/erddap/tabledap/allDatasets.csv", skiprows=[1])
 
-grids = grids.loc[grids['title'].str.contains('SOCAT', na=False)]
-for row_num, row in grids.iterrows():
-    for release in grid_dataset_titles.keys():
-        match = re.search(rf'\b{re.escape(release.lower())}\b', row['title'].lower())
-        if match is not None:
-            grid_dataset_titles[release].update({row['datasetID']: row['title']})
-    grid_dataset_options.append({'label': row['title'], 'value': row['datasetID']})
+# grids = grids.loc[grids['title'].str.contains('SOCAT', na=False)]
+# for row_num, row in grids.iterrows():
+#     for release in grid_dataset_titles.keys():
+#         match = re.search(rf'\b{re.escape(release.lower())}\b', row['title'].lower())
+#         if match is not None:
+#             grid_dataset_titles[release].update({row['datasetID']: row['title']})
+#     grid_dataset_options.append({'label': row['title'], 'value': row['datasetID']})
+
+grid_dataset_options.append({'label': 'Not Yet Implemented', 'value': None})
 
 # all columns: expocode,dataset_name,platform_name,platform_type,organization,geospatial_lon_min,geospatial_lon_max,geospatial_lat_min,geospatial_lat_max,time_coverage_start,time_coverage_end,investigators,socat_version,all_region_ids,socat_doi,qc_flag,sample_number,year,month,day,hour,minute,second,longitude,latitude,depth,sal,Temperature_equi,temp,Temperature_atm,Pressure_equi,Pressure_atm,xCO2_water_equi_temp_dry_ppm,xCO2_water_sst_dry_ppm,xCO2_water_equi_temp_wet_ppm,xCO2_water_sst_wet_ppm,pCO2_water_equi_temp,pCO2_water_sst_100humidity_uatm,fCO2_water_equi_uatm,fCO2_water_sst_100humidity_uatm,xCO2_atm_dry_actual,xCO2_atm_dry_interp,pCO2_atm_wet_actual,pCO2_atm_wet_interp,fCO2_atm_wet_actual,fCO2_atm_wet_interp,delta_xCO2,delta_pCO2,delta_fCO2,relative_humidity,specific_humidity,ship_speed,ship_dir,wind_speed_true,wind_speed_rel,wind_dir_true,wind_dir_rel,WOCE_CO2_water,WOCE_CO2_atm,woa_sss,pressure_ncep_slp,fCO2_insitu_from_xCO2_water_equi_temp_dry_ppm,fCO2_insitu_from_xCO2_water_sst_dry_ppm,fCO2_from_pCO2_water_water_equi_temp,fCO2_from_pCO2_water_sst_100humidity_uatm,fCO2_insitu_from_fCO2_water_equi_uatm,fCO2_insitu_from_fCO2_water_sst_100humidty_uatm,fCO2_from_pCO2_water_water_equi_temp_ncep,fCO2_from_pCO2_water_sst_100humidity_uatm_ncep,fCO2_insitu_from_xCO2_water_equi_temp_dry_ppm_woa,fCO2_insitu_from_xCO2_water_sst_dry_ppm_woa,fCO2_insitu_from_xCO2_water_equi_temp_dry_ppm_ncep,fCO2_insitu_from_xCO2_water_sst_dry_ppm_ncep,fCO2_insitu_from_xCO2_water_equi_temp_dry_ppm_ncep_woa,fCO2_insitu_from_xCO2_water_sst_dry_ppm_ncep_woa,fCO2_recommended,fCO2_source,delta_temp,region_id,calc_speed,etopo2,gvCO2,dist_to_land,day_of_year,time,lon360,tmonth,nobs_full,nobs_deci
 # 
