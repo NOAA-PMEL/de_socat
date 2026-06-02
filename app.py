@@ -105,6 +105,8 @@ logger = logging.getLogger(__name__)
 
 DOWNLOADS_FILE_DIRECTORY = os.path.abspath(os.path.join(os.getcwd(), "../mount/downloads"))
 
+Path("../mount/downloads").mkdir(parents=True, exist_ok=True)
+
 
 pp = pprint.PrettyPrinter(indent=4)
 
