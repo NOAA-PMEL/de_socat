@@ -14,7 +14,7 @@ pyproj
 redis
 kaleido
 packaging
-dash-ag-grid
+dash-ag-grid>=35
 SQLAlchemy
 pg8000
 PyMySQL

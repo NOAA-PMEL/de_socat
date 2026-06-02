@@ -499,9 +499,12 @@ def get_layout(
             dcc.Store(id="cruise_table_url"),
             dcc.Store(id='grid-data-key'),
             dcc.Store(id='crossover-endpoints'),
+            dcc.Store(id='download-filename'),
             dcc.Store(id='no-action'),
+            dcc.Download(id="download-file"),
             html.Div(id="kick", style={"visibility": "none"}),
             ddk.Header(content_alignment='left', children=header_children, ), # style={'margin-top': "-50px", 'z-index': '999', 'margin-right':'220px', 'border': 0}),
+            dcc.ConfirmDialog(id='download-warning-dialog', displayed=False),
             woce_edits_card,
             qc_entries_card,
             html.Div(id='cruise-view', children=[
@@ -926,10 +929,17 @@ def get_layout(
                                             value="table-sub-tab",
                                             style=second_tab_style,
                                             selected_style=second_tab_selected_style,
-                                            children=[
+                                            children=[ 
                                                 ddk.Card(
                                                     children=[
-                                                        # ddk.CardHeader(fullscreen=True),
+                                                        ddk.Block(children=[
+                                                            ddk.Block(width=.25, children=[
+                                                                html.Button(id='cruise-download', children='Create ZIP File of Checked Cruises for Download'),
+                                                            ]),
+                                                            ddk.Block(width=.1, children=[
+                                                                dcc.Loading(html.Button(id='download-link', children='DOWNLOAD READY', style={'display': 'none'})),
+                                                            ]),
+                                                        ]),
                                                         dcc.Loading(
                                                             children=[
                                                                 dag.AgGrid(
@@ -937,13 +947,18 @@ def get_layout(
                                                                     dashGridOptions={
                                                                         "pagination": True,
                                                                         "paginationAutoPageSize": True,
+                                                                        "rowSelection": {
+                                                                            "mode": "multiRow",      # Enables multi-row selection
+                                                                            "headerCheckbox": True,  # Adds the select-all checkbox to headers
+                                                                            "checkboxes": True       # Adds checkboxes to individual rows
+                                                                        }
                                                                     },
                                                                     columnSize="sizeToFit",
                                                                     defaultColDef={
                                                                         "resizable": True
                                                                     },
                                                                     style={
-                                                                        "height": "80vh"
+                                                                        "height": "78vh"
                                                                     },
                                                                 ),
                                                             ]

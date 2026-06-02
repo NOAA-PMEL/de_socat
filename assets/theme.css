@@ -6,6 +6,14 @@ Make the header menu float over everything.
   z-index: 999 !important;
 }
 
+/*
+   Pad the bottom of the grid container to make up for the button and other junk at the top of the grid container
+*/
+.ag-body-viewport {
+    padding-bottom: 60px; /* Adjust this value to hide exactly one or more rows */
+}
+
+
 
 /* 
   AG Grid WOCE cell classes
