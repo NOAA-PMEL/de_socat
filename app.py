@@ -1,4 +1,5 @@
 from datetime import date, datetime, timezone
+from flask import send_from_directory
 import hashlib
 import io
 from sys import exception
@@ -16,6 +17,10 @@ import xarray as xr
 import cf_xarray
 import re
 import inspect
+from pathlib import Path
+
+import zipfile
+import requests
 
 import colorcet as cc
 from dash import (
@@ -52,7 +57,7 @@ from plotly.subplots import make_subplots
 from pyproj import Transformer
 import redis
 from sdig.erddap.info import Info
-
+from celery.schedules import crontab
 
 from sqlalchemy.sql.selectable import NoInit
 import util
@@ -61,6 +66,7 @@ from dateutil import parser
 import callbacks
 import layout
 
+from tasks import delete_old_files
 
 from constants import (
     TIME_TO_LIVE,
@@ -97,6 +103,7 @@ logger = logging.getLogger(__name__)
 # segement by time to display to show the first 50000 with a time selector menu to see the remaning segments
 #
 
+DOWNLOADS_FILE_DIRECTORY = os.path.abspath(os.path.join(os.getcwd(), "../mount/downloads"))
 
 
 pp = pprint.PrettyPrinter(indent=4)
@@ -228,6 +235,13 @@ else:
 app = Dash(__name__, background_callback_manager=background_callback_manager)
 server = app.server  # expose server variable for Procfile
 
+@celery_app.on_after_configure.connect
+def setup_periodic_tasks(sender, **kwargs):
+    sender.add_periodic_task(
+         crontab(hour='1'),
+         delete_old_files.s(),
+         name='Delete files older than 24 hours'
+    )
 
 
 months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
@@ -1656,6 +1670,68 @@ def set_expo_from_table_click(cell):
 
 @app.callback(
     [
+        Output('download-filename', 'data'),
+        Output('download-link', 'style', allow_duplicate=True),
+        Output('download-warning-dialog', 'message'),
+        Output('download-warning-dialog', 'displayed')
+    ],
+    [
+        Input('cruise-download', 'n_clicks')
+    ],
+    [
+        State('table-of-cruises', 'selectedRows')
+    ], prevent_initial_call=True
+)
+def prepare_download(clik, rows):
+    fname = inspect.currentframe().f_code.co_name
+    if not rows:
+        return no_update, no_update, no_update, no_update
+    else:
+        if len(rows) < 100:
+            logger.debug(f"__{fname}__ download cruises with {len(rows)} cruises selected.")
+            files = full_url.replace('tabledap', 'files')
+            expocodes = []
+            hasher = hashlib.sha256()
+            for row in rows:
+                code = str(row['expocode'])
+                expocodes.append(code)
+        
+                # 2. Feed the current string into the hasher
+                hasher.update(code.encode('utf-8'))
+        
+                # 3. Feed a delimiter (like a null byte) to prevent collision issues
+                # (e.g., making sure ['ab', 'c'] doesn't generate the same hash as ['a', 'bc'])
+                hasher.update(b'\x00')
+
+            hash_string = hasher.hexdigest()
+            zip_file = f"../mount/downloads/download_{hash_string}.zip"
+            logger.debug(f"__{fname}__ zipping request to {zip_file}")
+            path = Path(zip_file)
+            if not path.is_file():
+                with zipfile.ZipFile(zip_file, 'w', zipfile.ZIP_DEFLATED) as zipf:
+                    for expo in expocodes:
+                        prefix = expo[0:4]
+                        download_url = f"{files}/{prefix}/{expo}.nc"
+                        filename = f"{expo}.nc"
+                        try:
+                            # Use stream=True for memory efficiency with large ERDDAP datasets
+                            with requests.get(download_url, stream=True) as response:
+                                response.raise_for_status()
+                                
+                                # Write the response content into the zip archive
+                                # Using writestr avoids creating temporary local files
+                                zipf.writestr(filename, response.content)
+                                logger.debug(f"__{fname}__ Successfully added {filename}")
+                                
+                        except Exception as e:
+                            logger.debug(f"__{fname}__ failed to add {filename} with {e}")
+            return [f'download_{hash_string}.zip', {'display': 'block'}, no_update, no_update]
+        else:
+            warning_msg = "Large Download: That's more than 100 files. Download fewer at a time."
+            return [no_update, no_update, warning_msg, True]
+
+@app.callback(
+    [
         Output('table-of-cruises', 'rowData'),
         Output('table-of-cruises', 'columnDefs'),
         Output('plot-expocode', 'options'),
@@ -1665,7 +1741,8 @@ def set_expo_from_table_click(cell):
         Output('crossover-expocode', 'options', allow_duplicate=True),
         Output('crossover-expocode', 'value', allow_duplicate=True),
         Output('crossover-message', 'children', allow_duplicate=True),
-        Output('cruise_table_url', 'data')
+        Output('cruise_table_url', 'data'),
+        Output('download-link', 'style', allow_duplicate=True)
     ],
     [
         Input('top-level-tabs', 'value')
@@ -1764,12 +1841,12 @@ def make_table_of_crusies(da_click, mt_in_expocodes, mt_in_start_date, mt_in_end
         # and so we can make a map from the locations database
         # TODO how to make this unique (with a hash of the URL)
         redis_instance.hset(hash_digest, TABLE_OF_CRUISES_URL_FIELD_NAME, json.dumps(df.to_json()))
-        return [df.to_dict("records"), table_of_cruises_columnDefs, expo_options, expo_value, 'go', '', [], '', 'Use button to check for crossovers.', hash_digest]
+        return [df.to_dict("records"), table_of_cruises_columnDefs, expo_options, expo_value, 'go', '', [], '', 'Use button to check for crossovers.', hash_digest, {'display': 'none'}]
     else:
         df = pd.DataFrame(columns=['no_data'])
         redis_instance.hset('no_data', 'table-of-cruises', json.dumps(df.to_json()))
         tcd = [{'field': 'no_data', 'headerName': 'No matching cruises found...'}]
-        return [df.to_dict("records"), tcd, {}, '', 'go', '', [], '', 'Use button to check for crossovers.', hash_digest]
+        return [df.to_dict("records"), tcd, {}, '', 'go', '', [], '', 'Use button to check for crossovers.', hash_digest, {'display': 'none'}]
 
 
 @app.callback(
@@ -2138,6 +2215,25 @@ clientside_callback(
     Input("crossover-timeseries", "hoverData"),
     State("crossover-trace-graph", "id"),
 )
+
+
+@app.callback(
+    Output("download-file", "data"),
+    Output('download-link', 'style', allow_duplicate=True),
+    Input("download-link", "n_clicks"),
+    State('download-filename', 'data'),
+    prevent_initial_call=True
+)
+def trigger_download(n_clicks, filename):
+    if filename and len(filename) > 0:
+        # Construct the path to your target file inside the persistent storage
+        file_path = os.path.join(DOWNLOADS_FILE_DIRECTORY, filename)
+        
+        # dcc.send_file builds the compliant payload dict automatically 
+        # Valid keys generated: filename, content, base64, type
+        return dcc.send_file(file_path), {'display': 'none'}
+    else:
+        return no_update, no_update
 
 
 if __name__ == '__main__':
