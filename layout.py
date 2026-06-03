@@ -31,7 +31,7 @@ header_children_base = [
     ),
     ddk.Title("Surface Ocean CO\u2082 Atlas Data Viewer"),
     ddk.Block(width=1, style={'max-width':'450px'}, children=[
-        dcc.Dropdown(id='viewer', options=[
+        dcc.Dropdown(id='viewer', searchable=False, options=[
             {'label':"SOCAT Cruises", 'value':'cruises'},
             {'label': "SOCAT Gridded Summaries", "value":"grids"}
         ], value="cruises", clearable=False)
@@ -1340,133 +1340,117 @@ def get_layout(
             ]),
             html.Div(id='grid-view', style={'display': 'none'}, children=[
                 ddk.Block(width=.25, children=[
-                    dcc.Tabs(
-                    id="grid-control-tabs",
-                    value="dataset",
-                    style=tabs_styles,
-                    children=[
-                        dcc.Tab(                            
-                            id="dataset-tab",
-                            value="dataset",
-                            label="Dataset Selection",
-                            style=tab_style,
-                            selected_style=tab_selected_style,
-                            children=[
-                                ddk.ControlCard(children=[
-                                    ddk.CardHeader("SOCAT Release"),
-                                    dcc.Dropdown(id='grid-socat-release', options=socat_release_options)
-                                ]),
-                                ddk.ControlCard(children=[
-                                    ddk.CardHeader("Data set"),
-                                    dcc.Dropdown(id='grid-dataset', options=grid_dataset_options)
-                                ]),
-                         ]),
-                        dcc.Tab(id="plot-tab", value="grid-plot", label="Plot Controls", style=tab_style, selected_style=tab_selected_style, children=[
-                            ddk.ControlCard(children=[
-                                ddk.CardHeader("Variable"),
-                                dcc.Dropdown(id='grid-variable')
+                    ddk.ControlCard(children=[
+                        ddk.CardHeader("SOCAT Release"),
+                        dcc.Dropdown(id='grid-socat-release', options=socat_release_options)
+                    ]),
+                    ddk.ControlCard(children=[
+                        ddk.CardHeader("Data set"),
+                        dcc.Dropdown(id='grid-dataset', options=grid_dataset_options)
+                    ]),
+                    ddk.ControlCard(children=[
+                        ddk.CardHeader("Variable"),
+                        dcc.Dropdown(id='grid-variable')
+                    ]),
+                    ddk.ControlCard(children=[
+                        ddk.CardHeader(children=[
+                            dcc.Checklist(id='time-aggregations-switch', options=[
+                                {'label':'Apply mean, min, max, or sum over time range.', 'value': 'on'}
                             ]),
-                            ddk.ControlCard(children=[
-                                ddk.CardHeader(children=[
-                                    dcc.Checklist(id='time-aggregations-switch', options=[
-                                        {'label':'Apply mean, min, max, or sum over time range.', 'value': 'on'}
-                                    ]),
-                                ]),
-                                dcc.Dropdown(id='aggregation-type', style={'display': 'none'}, options=[
-                                    {'label': 'Mean', 'value': 'mean'},
-                                    {'label': 'Min', 'value': 'min'},
-                                    {'label': 'Max', 'value': 'max'},
-                                    {'label': 'Sum', 'value': 'sum'},
+                        ]),
+                        dcc.Dropdown(id='aggregation-type', style={'display': 'none'}, options=[
+                            {'label': 'Mean', 'value': 'mean'},
+                            {'label': 'Min', 'value': 'min'},
+                            {'label': 'Max', 'value': 'max'},
+                            {'label': 'Sum', 'value': 'sum'},
+                        ])
+                    ]),
+                    ddk.ControlCard(children=[
+                        ddk.CardHeader(style={'margin-top': '10px'}, children="Start Date"),
+                        ddk.Block(width=1, children=[
+                            ddk.Block(width=.3, children=[
+                                dcc.Dropdown(id='grid-year', placeholder='Year'),
+                            ]),
+                            ddk.Block(width=.7, children=[
+                                dcc.Dropdown(id='grid-month', placeholder="Month", options=[
+                                    {'label': 'January', 'value': '01'},
+                                    {'label': 'February', 'value': '02'},
+                                    {'label': 'March', 'value': '03'},
+                                    {'label': 'April', 'value': '03'},
+                                    {'label': 'May', 'value': '05'},
+                                    {'label': 'June', 'value': '06'},
+                                    {'label': 'July', 'value': '07'},
+                                    {'label': 'August', 'value': '08'},
+                                    {'label': 'September', 'value': '09'},
+                                    {'label': 'October', 'value': '10'},
+                                    {'label': 'November', 'value': '11'},
+                                    {'label': 'December', 'value': '12'},
                                 ])
-                            ]),
-                            ddk.ControlCard(children=[
-                                ddk.CardHeader(style={'margin-top': '10px'}, children="Start Date"),
-                                ddk.Block(width=1, children=[
-                                    ddk.Block(width=.3, children=[
-                                        dcc.Dropdown(id='grid-year', placeholder='Year'),
-                                    ]),
-                                    ddk.Block(width=.7, children=[
-                                        dcc.Dropdown(id='grid-month', placeholder="Month", options=[
-                                            {'label': 'January', 'value': '01'},
-                                            {'label': 'February', 'value': '02'},
-                                            {'label': 'March', 'value': '03'},
-                                            {'label': 'April', 'value': '03'},
-                                            {'label': 'May', 'value': '05'},
-                                            {'label': 'June', 'value': '06'},
-                                            {'label': 'July', 'value': '07'},
-                                            {'label': 'August', 'value': '08'},
-                                            {'label': 'September', 'value': '09'},
-                                            {'label': 'October', 'value': '10'},
-                                            {'label': 'November', 'value': '11'},
-                                            {'label': 'December', 'value': '12'},
-                                        ])
-                                    ])
-                                ]), 
-                            ]),
-                            html.Div(id='aggregation-controls', style={'display':'none'}, children=[
-                                ddk.ControlCard(id='grid-end-date', children=[
-                                    ddk.CardHeader(style={'margin-top': '10px'}, children="End Date"),
-                                    ddk.Block(width=1, children=[
-                                        ddk.Block(width=.3, children=[
-                                            dcc.Dropdown(id='grid-year-end', placeholder='Year'),
-                                        ]),
-                                        ddk.Block(width=.7, children=[
-                                            dcc.Dropdown(id='grid-month-end', placeholder="Month", options=[
-                                                {'label': 'January', 'value': '01'},
-                                                {'label': 'February', 'value': '02'},
-                                                {'label': 'March', 'value': '03'},
-                                                {'label': 'April', 'value': '03'},
-                                                {'label': 'May', 'value': '05'},
-                                                {'label': 'June', 'value': '06'},
-                                                {'label': 'July', 'value': '07'},
-                                                {'label': 'August', 'value': '08'},
-                                                {'label': 'September', 'value': '09'},
-                                                {'label': 'October', 'value': '10'},
-                                                {'label': 'November', 'value': '11'},
-                                                {'label': 'December', 'value': '12'},
-                                            ])
-                                        ])
-                                    ]),
+                            ])
+                        ]), 
+                    ]),
+                    html.Div(id='aggregation-controls', style={'display':'none'}, children=[
+                        ddk.ControlCard(id='grid-end-date', children=[
+                            ddk.CardHeader(style={'margin-top': '10px'}, children="End Date"),
+                            ddk.Block(width=1, children=[
+                                ddk.Block(width=.3, children=[
+                                    dcc.Dropdown(id='grid-year-end', placeholder='Year'),
                                 ]),
-                            ]),
-                            ddk.ControlCard(id='grid-download', children=[
-                                ddk.CardHeader("Grid Data Download"),
-                                dcc.Loading(children=[
-                                    html.Div(style={'display':'flex'}, children=[
-                                        ddk.Modal(
-                                            id="grid-show-data-modal",
-                                            target_id="grid-show-data-card",
-                                            hide_target=True,
-                                            children=[
-                                                html.Button(id='grid-show-button', children="Show"),
-                                            ]),
-                                        html.A(id='grid-csv', href='', target="_blank", referrerPolicy="no-referrer", children=[html.Button(id='grid-csv-button', children="CSV", style={'margin-left': '5px', 'margin-right': '5px', 'margin-top': '5px'})]),
-                                        html.A(id='grid-netcdf', href='', target="_blank", children=[html.Button(id='grid-netcdf-button', children="netCDF", style={'margin-top': '5px'})]),
+                                ddk.Block(width=.7, children=[
+                                    dcc.Dropdown(id='grid-month-end', placeholder="Month", options=[
+                                        {'label': 'January', 'value': '01'},
+                                        {'label': 'February', 'value': '02'},
+                                        {'label': 'March', 'value': '03'},
+                                        {'label': 'April', 'value': '03'},
+                                        {'label': 'May', 'value': '05'},
+                                        {'label': 'June', 'value': '06'},
+                                        {'label': 'July', 'value': '07'},
+                                        {'label': 'August', 'value': '08'},
+                                        {'label': 'September', 'value': '09'},
+                                        {'label': 'October', 'value': '10'},
+                                        {'label': 'November', 'value': '11'},
+                                        {'label': 'December', 'value': '12'},
                                     ])
                                 ])
                             ]),
-                            # Hidden card for show data dialog
-                            ddk.Card(id="grid-show-data-card",
-                                children=[
-                                    ddk.CardHeader(id='grid-show-data-header', title="Data Table for Gridded Summary"),
-                                    dag.AgGrid(
-                                        id="grid-show-data-grid",
-                                        dashGridOptions={
-                                            "pagination": True
-                                        },
-                                        columnSize="sizeToFit",
-                                        defaultColDef={
-                                            "resizable": True
-                                        },
-                                        style={
-                                            "height": "80vh",
-                                            # "width": "100%",
-                                        },
-                                    ),
-                                ]
-                            ),
                         ]),
                     ]),
+                    ddk.ControlCard(id='grid-download', children=[
+                        ddk.CardHeader("Grid Data Download"),
+                        dcc.Loading(children=[
+                            html.Div(style={'display':'flex'}, children=[
+                                ddk.Modal(
+                                    id="grid-show-data-modal",
+                                    target_id="grid-show-data-card",
+                                    hide_target=True,
+                                    children=[
+                                        html.Button(id='grid-show-button', children="Show"),
+                                    ]),
+                                html.A(id='grid-csv', href='', target="_blank", referrerPolicy="no-referrer", children=[html.Button(id='grid-csv-button', children="CSV", style={'margin-left': '5px', 'margin-right': '5px', 'margin-top': '5px'})]),
+                                html.A(id='grid-netcdf', href='', target="_blank", children=[html.Button(id='grid-netcdf-button', children="netCDF", style={'margin-top': '5px'})]),
+                            ])
+                        ])
+                    ]),
+                    # Hidden card for show data dialog
+                    ddk.Card(id="grid-show-data-card",
+                        children=[
+                            ddk.CardHeader(id='grid-show-data-header', title="Data Table for Gridded Summary"),
+                            dag.AgGrid(
+                                id="grid-show-data-grid",
+                                dashGridOptions={
+                                    "pagination": True
+                                },
+                                columnSize="sizeToFit",
+                                defaultColDef={
+                                    "resizable": True
+                                },
+                                style={
+                                    "height": "80vh",
+                                    # "width": "100%",
+                                },
+                            ),
+                        ]
+                    ),
                 ]),
                 ddk.Card(width=.75, style={'height': '86vh'}, children=[
                     dcc.Loading(ddk.CardHeader(id='grid-title')),

@@ -61,6 +61,7 @@ from celery.schedules import crontab
 
 from sqlalchemy.sql.selectable import NoInit
 import util
+from util import get_empty
 from datetime import datetime
 from dateutil import parser
 import callbacks
@@ -94,7 +95,7 @@ from constants import (
 from blank import get_blank
 
 import logging
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.WARN)
 logger = logging.getLogger(__name__)
 
 
@@ -240,8 +241,8 @@ server = app.server  # expose server variable for Procfile
 @celery_app.on_after_configure.connect
 def setup_periodic_tasks(sender, **kwargs):
     sender.add_periodic_task(
-         crontab(hour='1'),
-         delete_old_files.s(),
+         crontab(hour='1', minute='0'),
+         delete_old_files.s('../mount/downloads'),
          name='Delete files older than 24 hours'
     )
 
@@ -263,20 +264,19 @@ columns_for_WOCE_edits = ["WOCE_CO2_water" ,"WOCE_CO2_atm", "fCO2_recommended", 
 
 
 socat_release_options = [
-    {'label': 'Not Yet Implemented', 'value': 'NOT', 'disabled': True},
-    # {'label': 'SOCAT v2025', 'value':'v2025', 'disabled': True},
-    # {'label': 'SOCAT v2024', 'value':'v2024', 'disabled': True},
-    # {'label': 'SOCAT v2023', 'value':'v2023', 'disabled': True},
-    # {'label': 'SOCAT v2022', 'value':'v2022', 'disabled': True},
-    # {'label': 'SOCAT v2021', 'value':'v2021', 'disabled': True},
-    # {'label': 'SOCAT v2020', 'value':'v2020', 'disabled': True},
-    # {'label': 'SOCAT v2019', 'value':'v2019', 'disabled': True},
-    # {'label': 'SOCAT v6', 'value':'v6', 'disabled': True},
-    # {'label': 'SOCAT v5', 'value':'v5', 'disabled': True},
-    # {'label': 'SOCAT v4', 'value':'v4', 'disabled': True},
-    # {'label': 'SOCAT v3', 'value':'v3', 'disabled': True},
-    # {'label': 'SOCAT v2', 'value':'v2', 'disabled': True},
-    # {'label': 'SOCAT v1.5', 'value':'v1.5', 'disabled': True},
+    {'label': 'SOCAT v2025', 'value':'v2025', 'disabled': False},
+    {'label': 'SOCAT v2024', 'value':'v2024', 'disabled': False},
+    {'label': 'SOCAT v2023', 'value':'v2023', 'disabled': False},
+    {'label': 'SOCAT v2022', 'value':'v2022', 'disabled': False},
+    {'label': 'SOCAT v2021', 'value':'v2021', 'disabled': False},
+    {'label': 'SOCAT v2020', 'value':'v2020', 'disabled': False},
+    {'label': 'SOCAT v2019', 'value':'v2019', 'disabled': False},
+    {'label': 'SOCAT v6', 'value':'v6', 'disabled': False},
+    {'label': 'SOCAT v5', 'value':'v5', 'disabled': False},
+    {'label': 'SOCAT v4', 'value':'v4', 'disabled': False},
+    {'label': 'SOCAT v3', 'value':'v3', 'disabled': False},
+    {'label': 'SOCAT v2', 'value':'v2', 'disabled': False},
+    {'label': 'SOCAT v1.5', 'value':'v1.5', 'disabled': False},
 ]
 grid_dataset_options=[]
 grid_dataset_titles = {
@@ -296,17 +296,15 @@ grid_dataset_titles = {
 }
 
 # Read from a file until the data sets are in an accesible ERDDAP
-# grids = pd.read_csv("http://hazy.pmel.noaa.gov:8140/erddap/tabledap/allDatasets.csv", skiprows=[1])
+grids = pd.read_csv("https://data.pmel.noaa.gov/socat/erddap/griddap/index.csv")
 
-# grids = grids.loc[grids['title'].str.contains('SOCAT', na=False)]
-# for row_num, row in grids.iterrows():
-#     for release in grid_dataset_titles.keys():
-#         match = re.search(rf'\b{re.escape(release.lower())}\b', row['title'].lower())
-#         if match is not None:
-#             grid_dataset_titles[release].update({row['datasetID']: row['title']})
-#     grid_dataset_options.append({'label': row['title'], 'value': row['datasetID']})
-
-grid_dataset_options.append({'label': 'Not Yet Implemented', 'value': None})
+grids = grids.loc[grids['Title'].str.contains('SOCAT', na=False)]
+for row_num, row in grids.iterrows():
+    for release in grid_dataset_titles.keys():
+        match = re.search(rf'\b{re.escape(release.lower())}\b', row['Title'].lower())
+        if match is not None:
+            grid_dataset_titles[release].update({row['Dataset ID']: row['Title']})
+    grid_dataset_options.append({'label': row['Title'], 'value': row['Dataset ID']})
 
 # all columns: expocode,dataset_name,platform_name,platform_type,organization,geospatial_lon_min,geospatial_lon_max,geospatial_lat_min,geospatial_lat_max,time_coverage_start,time_coverage_end,investigators,socat_version,all_region_ids,socat_doi,qc_flag,sample_number,year,month,day,hour,minute,second,longitude,latitude,depth,sal,Temperature_equi,temp,Temperature_atm,Pressure_equi,Pressure_atm,xCO2_water_equi_temp_dry_ppm,xCO2_water_sst_dry_ppm,xCO2_water_equi_temp_wet_ppm,xCO2_water_sst_wet_ppm,pCO2_water_equi_temp,pCO2_water_sst_100humidity_uatm,fCO2_water_equi_uatm,fCO2_water_sst_100humidity_uatm,xCO2_atm_dry_actual,xCO2_atm_dry_interp,pCO2_atm_wet_actual,pCO2_atm_wet_interp,fCO2_atm_wet_actual,fCO2_atm_wet_interp,delta_xCO2,delta_pCO2,delta_fCO2,relative_humidity,specific_humidity,ship_speed,ship_dir,wind_speed_true,wind_speed_rel,wind_dir_true,wind_dir_rel,WOCE_CO2_water,WOCE_CO2_atm,woa_sss,pressure_ncep_slp,fCO2_insitu_from_xCO2_water_equi_temp_dry_ppm,fCO2_insitu_from_xCO2_water_sst_dry_ppm,fCO2_from_pCO2_water_water_equi_temp,fCO2_from_pCO2_water_sst_100humidity_uatm,fCO2_insitu_from_fCO2_water_equi_uatm,fCO2_insitu_from_fCO2_water_sst_100humidty_uatm,fCO2_from_pCO2_water_water_equi_temp_ncep,fCO2_from_pCO2_water_sst_100humidity_uatm_ncep,fCO2_insitu_from_xCO2_water_equi_temp_dry_ppm_woa,fCO2_insitu_from_xCO2_water_sst_dry_ppm_woa,fCO2_insitu_from_xCO2_water_equi_temp_dry_ppm_ncep,fCO2_insitu_from_xCO2_water_sst_dry_ppm_ncep,fCO2_insitu_from_xCO2_water_equi_temp_dry_ppm_ncep_woa,fCO2_insitu_from_xCO2_water_sst_dry_ppm_ncep_woa,fCO2_recommended,fCO2_source,delta_temp,region_id,calc_speed,etopo2,gvCO2,dist_to_land,day_of_year,time,lon360,tmonth,nobs_full,nobs_deci
 # 
@@ -391,8 +389,7 @@ def set_grid_datasets(in_socat_release):
         for idx, dataset in enumerate(datasets):
             if idx == 0:
                 first_dataset = dataset
-            only_one = not ('v2025' in dataset) # DEBUG
-            socat_dataset_options.append({'label': datasets[dataset], 'value': dataset, 'disabled': only_one}) # disabled is for DEBUG
+            socat_dataset_options.append({'label': datasets[dataset], 'value': dataset,})
         return [socat_dataset_options, first_dataset]
     else:
         raise exceptions.PreventUpdate
@@ -481,7 +478,6 @@ def grid_map(in_dataset, in_variable, in_year, in_month, in_aggregate_on, in_yea
             encoded_url = csv_url.encode('utf-8')
             hash_object = hashlib.sha256(encoded_url)
             grid_data_key = hash_object.hexdigest()
-            csv_url = 'http://hazy.pmel.noaa.gov:8140/erddap/griddap/v2025_c716_f8c7_183a.csv?sst_ave_unwtd%5B(2011-04-16):1:(2011-04-16)%5D%5B(-89.5):1:(89.5)%5D%5B(-179.5):1:(179.5)%5D'
             netcdf_url = csv_url.replace(".csv", ".nc")
             ds = ds.sel(time=selected_time, method='nearest')
             df = ds.cf.to_dataframe()
@@ -527,19 +523,22 @@ def grid_map(in_dataset, in_variable, in_year, in_month, in_aggregate_on, in_yea
 
                 title = f'{in_agg_type.title()} of {in_variable} from {selected_time} to {end_time}'
 
+        if not df.empty:
         # Calculate the .1 and .9 quantile and use them for the color range rounding down and up to the nearest 5 for numeric data
-        if is_numeric_dtype(df[in_variable]):
-            ranges = df[in_variable].quantile(q=[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9])
-            cmax = 5 * round(ranges[0.9] / 5.0)
-            cmin = (ranges[0.1] // 5.0) * 5.0
-            logger.debug(f'__{fname}__ color min and max for {in_variable} are {cmin}, {cmax}')
-            figure = px.scatter_geo(df, lat='latitude', lon='longitude', color=in_variable, color_continuous_scale='Inferno', range_color=[cmin, cmax])
+            if is_numeric_dtype(df[in_variable]):
+                ranges = df[in_variable].quantile(q=[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9])
+                cmax = 5 * round(ranges[0.9] / 5.0)
+                cmin = (ranges[0.1] // 5.0) * 5.0
+                logger.debug(f'__{fname}__ color min and max for {in_variable} are {cmin}, {cmax}')
+                figure = px.scatter_geo(df, lat='latitude', lon='longitude', color=in_variable, color_continuous_scale='Inferno', range_color=[cmin, cmax])
+            else:
+                figure = px.scatter_geo(df, lat='latitude', lon='longitude', color=in_variable)
+            figure.update_layout(legend={'xanchor':'left', 'x': 0,}, margin={'t':35, 'r':0, 'l':0, 'b':0}, title={'text':title, 'y':.95, 'yanchor':'top'})
+            figure.update_coloraxes(colorbar={'title': in_variable, 'lenmode':'fraction', 'len':.65, 'y':.5, 'orientation':'v', 'title_side':'right'})
+            figure.update_geos(fitbounds='locations', lonaxis_range=[-180,180], lataxis_range=[-90,90])
+            figure.update_geos(coastlinecolor='black', coastlinewidth=1, showocean=True, showland=True, landcolor='tan', oceancolor="#AADAFF", resolution=50)
         else:
-            figure = px.scatter_geo(df, lat='latitude', lon='longitude', color=in_variable)
-        figure.update_layout(legend={'xanchor':'left', 'x': 0,}, margin={'t':35, 'r':0, 'l':0, 'b':0}, title={'text':title, 'y':.95, 'yanchor':'top'})
-        figure.update_coloraxes(colorbar={'title': in_variable, 'lenmode':'fraction', 'len':.65, 'y':.5, 'orientation':'v', 'title_side':'right'})
-        figure.update_geos(fitbounds='locations', lonaxis_range=[-180,180], lataxis_range=[-90,90])
-        figure.update_geos(coastlinecolor='black', coastlinewidth=1, showocean=True, showland=True, landcolor='tan', oceancolor="#AADAFF", resolution=50)
+            figure = get_empty(f'No data found for {in_variable} at {selected_time}')
         # Title is just for the loading indicator
         return ['', figure, netcdf_url, csv_url, grid_data_key]
 

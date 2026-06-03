@@ -1,5 +1,6 @@
 from numpy import isin
 from sdig.erddap.info import Info
+import plotly.graph_objects as go
 
 import urllib
 
@@ -25,3 +26,22 @@ def make_query(column_name, menu_input, add_and):
         if add_and:
             con = ' AND ' + con
     return con
+
+def get_empty(message):
+    no_data_graph = go.Figure()
+    no_data_graph = no_data_graph.update_layout(
+        xaxis =  { "visible": False },
+        yaxis = { "visible": False },
+        annotations = [
+            {   
+                "text": message,
+                "xref": "paper",
+                "yref": "paper",
+                "showarrow": False,
+                "font": {
+                    "size": 28
+                }
+            }
+        ]
+    )
+    return no_data_graph
