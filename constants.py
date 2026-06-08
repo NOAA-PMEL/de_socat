@@ -37,8 +37,10 @@ if socat_mode == "VIEWER":
     qc_flags = []
 elif socat_mode == "QC_EDITOR":
     map_title_base = 'Trajectory from the latest SOCAT Decimated Data Set '
-    decimated_url = 'https://datalocal.pmel.noaa.gov/erddap/tabledap/socat_latest_decimated'
-    full_url = 'https://datalocal.pmel.noaa.gov/erddap/tabledap/socat_latest_fulldata'
+    # decimated_url = 'https://datalocal.pmel.noaa.gov/erddap/tabledap/socat_latest_decimated'
+    # full_url = 'https://datalocal.pmel.noaa.gov/erddap/tabledap/socat_latest_fulldata'
+    decimated_url = 'https://data.pmel.noaa.gov/socat/erddap/tabledap/socat_v2025_decimated'
+    full_url = 'https://data.pmel.noaa.gov/socat/erddap/tabledap/socat_v2025_fulldata'
     grid_url = 'https://data.pmel.noaa.gov/socat/erddap/griddap'
     qc_flags = ["Q", "U", "N"]
 
