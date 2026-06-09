@@ -1769,7 +1769,7 @@ def prepare_download(clik, rows):
 def make_table_of_crusies(da_click, mt_in_expocodes, mt_in_start_date, mt_in_end_date, mt_in_woce_water, mt_in_regions, mt_in_investigator, mt_in_valid_data, mt_in_org, mt_in_version, mt_in_qc_flag, mt_in_platform_name, mt_in_platform_type, mt_in_map_info):
     fname = inspect.currentframe().f_code.co_name
     if da_click == "map" or da_click == 'plots':
-        return [no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update]
+        return [no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update]
     vars_to_get = ['expocode', 'platform_name',	'platform_type', 'investigators', 'qc_flag', 'socat_version']
     valid_con = ''
     if mt_in_valid_data is not None and len(mt_in_valid_data)>0:

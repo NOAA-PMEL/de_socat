@@ -1,6 +1,6 @@
 from dash import Input, Output, State, no_update
 import constants
-from constants import COLUMNS_FOR_WOCE_EDIT_TABLE_FIELD_NAME
+from constants import COLUMNS_FOR_WOCE_EDIT_TABLE_FIELD_NAME, postgres_engine
 import json
 from io import StringIO
 import constants
@@ -107,6 +107,7 @@ def register_editor_callbacks(app):
             for row in row_data:
                 if row['time'] == time:
                     row[flag_to_set] = int(woce_flag)
+        print('crashed all the way through the update of woce water flag')
         return row_data, []
         
 
@@ -126,6 +127,8 @@ def register_editor_callbacks(app):
         ], prevent_initial_call=True
     )
     def save_flags(click, edited_points, in_comment):
+        # The table has been updated in the UI so some rows are edited and some are not,
+        # we can sort it out by reading the original data and the data passed in and saving the difference.
         reminder = 'You must supply a comment.'
         ex_reminder = 'No, really. You must supply a comment telling what you did and why.'
         if in_comment is None or len(in_comment) == 0 or in_comment == reminder or in_comment == ex_reminder:
