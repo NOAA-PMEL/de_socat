@@ -28,7 +28,7 @@ connection_string = "postgresql+pg8000" + os.environ.get(
 
 # Prod, read only at the MySQL side for now.
 params = {
-    'host': 'smokey.pmel.noaa.gov',
+    'host': 'hazy.pmel.noaa.gov',
     'user': 'erddap',
     'password': os.environ['MYSQL_PASSWORD'],
     'port': 3306,
