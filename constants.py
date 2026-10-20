@@ -6,6 +6,8 @@ import redis
 from sqlalchemy import all_, create_engine, engine
 from sqlalchemy.pool import NullPool
 
+QUEUE_URL = "https://sqs.us-east-1.amazonaws.com/807604749487/dash-sqs"
+
 TIME_TO_LIVE = 3600 # time to live af an entry in the redis cache
 
 FULL_CRUISE_DATA_FIELD_NAME = 'cruise_data'
@@ -29,20 +31,24 @@ map_width = 1200
 # QC flags and WOCE flags to be set.
 socat_mode = os.environ.get("SOCAT_MODE", "VIEWER")
 
+VERSION_ID = "socat_v2026"
+
 if socat_mode == "VIEWER":
     map_title_base = 'Trajectory from the latest SOCAT Decimated Data Set '
-    decimated_url = 'https://data.pmel.noaa.gov/socat/erddap/tabledap/socat_v2025_decimated'
-    full_url = 'https://data.pmel.noaa.gov/socat/erddap/tabledap/socat_v2025_fulldata'
+    decimated_url = f'https://data.pmel.noaa.gov/socat/erddap/tabledap/{VERSION_ID}_decimated'
+    full_url = f'https://data.pmel.noaa.gov/socat/erddap/tabledap/{VERSION_ID}_fulldata'
     grid_url = 'https://data.pmel.noaa.gov/socat/erddap/griddap'
     qc_flags = []
+    save_socat_edits = ''
 elif socat_mode == "QC_EDITOR":
     map_title_base = 'Trajectory from the latest SOCAT Decimated Data Set '
     # decimated_url = 'https://datalocal.pmel.noaa.gov/erddap/tabledap/socat_latest_decimated'
     # full_url = 'https://datalocal.pmel.noaa.gov/erddap/tabledap/socat_latest_fulldata'
-    decimated_url = 'https://data.pmel.noaa.gov/socat/erddap/tabledap/socat_v2025_decimated'
-    full_url = 'https://data.pmel.noaa.gov/socat/erddap/tabledap/socat_v2025_fulldata'
+    decimated_url = f'https://data.pmel.noaa.gov/socat/erddap/tabledap/{VERSION_ID}_decimated'
+    full_url = f'https://data.pmel.noaa.gov/socat/erddap/tabledap/{VERSION_ID}_fulldata'
     grid_url = 'https://data.pmel.noaa.gov/socat/erddap/griddap'
     qc_flags = ["Q", "U", "N"]
+    save_socat_edits = 'https://sour.pmel.noaa.gov:8940/SaveSocatEdits'
 
 
 
@@ -76,6 +82,31 @@ atm_edit_style = {
                 "yellow-cell": "params.data.WOCE_CO2_atm == 3",
                 "red-cell": "params.data.WOCE_CO2_atm == 4"
             }
+
+
+socatQC = { 
+				'validExpoChars': "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-",
+
+				'fco2two': "Accuracy of calculated fCO2w (at SST) less than 2 uatm",
+				'fco2five': "Accuracy of calculated fCO2w (at SST) less than 5 uatm",
+				'fco2ten': "Accuracy of calculated fCO2w (at SST) less than 10 uatm",
+				'fco2bad': "Accuracy of calculated fCO2w (at SST) more than 10 uatm",
+
+				'soptrue': "Followed standard methods/SOP",
+				'sopfalse': "Did not follow standard methods/SOP",
+
+				'metacomplete': "Metadata complete",
+				'metalacking': "Metadata not complete",
+
+				'datagood': "Data quality acceptable",
+				'databad': "Significant amount of unacceptable-quality data",
+
+				'crossfound': "High-quality cross-over with ",
+				'crossnone': "No high-quality cross-overs found at the time of this QC",
+
+				'commentSpacer': ".  "
+			}
+
 
 edits_table = 'socat_edits'
 qc_entries_table = 'qc_entries'
