@@ -90,7 +90,9 @@ from constants import (
     center, 
     map_limits, 
     map_height, 
-    map_width
+    map_width,
+    map_title_base,
+    TITLE_VERSION
 )
 from blank import get_blank
 
@@ -1059,7 +1061,7 @@ region_id
         figure.update_layout(title='Query returned no results.')
         return [figure, 'No matching data found.', False]  
 
-    title = f'Number of observations in each 1\u00B0 by 1\u00B0 box (Log10 color scale).'
+    title = f'Number of observations in each 1\u00B0 by 1\u00B0 box (Log10 color scale) from {TITLE_VERSION}.'
     map_type='geo'
     mask_trace = None
     filtered_df = pd.DataFrame()

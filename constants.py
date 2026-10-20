@@ -1,5 +1,5 @@
 from theme import theme
-from dash import html
+from dash import html, version
 import dash_design_kit as ddk
 import os
 import redis
@@ -32,16 +32,18 @@ map_width = 1200
 socat_mode = os.environ.get("SOCAT_MODE", "VIEWER")
 
 VERSION_ID = "socat_v2026"
+TITLE_VERSION = VERSION_ID.replace("_", " ")
+TITLE_VERSION = TITLE_VERSION[0:5].upper() + TITLE_VERSION[5:]
 
 if socat_mode == "VIEWER":
-    map_title_base = 'Trajectory from the latest SOCAT Decimated Data Set '
+    map_title_base = f'Trajectory from the {TITLE_VERSION} Decimated Data Set '
     decimated_url = f'https://data.pmel.noaa.gov/socat/erddap/tabledap/{VERSION_ID}_decimated'
     full_url = f'https://data.pmel.noaa.gov/socat/erddap/tabledap/{VERSION_ID}_fulldata'
     grid_url = 'https://data.pmel.noaa.gov/socat/erddap/griddap'
     qc_flags = []
     save_socat_edits = ''
 elif socat_mode == "QC_EDITOR":
-    map_title_base = 'Trajectory from the latest SOCAT Decimated Data Set '
+    map_title_base = f'Trajectory from the {TITLE_VERSION} Decimated Data Set '
     # decimated_url = 'https://datalocal.pmel.noaa.gov/erddap/tabledap/socat_latest_decimated'
     # full_url = 'https://datalocal.pmel.noaa.gov/erddap/tabledap/socat_latest_fulldata'
     decimated_url = f'https://data.pmel.noaa.gov/socat/erddap/tabledap/{VERSION_ID}_decimated'
