@@ -896,7 +896,9 @@ def get_layout(
                                 ),
                                 ddk.Card(
                                     width=0.75,
-                                    style={"height": "86vh"},
+                                    style={
+                                        "height": "87vh",          # 85% of viewport height (adjust to 90vh or 100% depending on parent container)
+                                    },
                                     children=[
                                         ddk.CardHeader(
                                             id="map-graph-header",
@@ -904,8 +906,9 @@ def get_layout(
                                         ),
                                         ddk.Graph(
                                             id="map-graph",
-                                            style={"height": "95%", "width": "95%"},
-                                            config=main_map_config,
+                                            # style={"width": "100%", "height": "45vw", "margin": "0 auto"},
+                                            style={"height": "83vh", "width": "100%"},
+                                            config={**main_map_config, "responsive": True}, # Force canvas recalculations
                                         ),
                                     ],
                                 ),

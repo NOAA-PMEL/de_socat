@@ -29,6 +29,7 @@ ipython_config.py
 # Environments
 .env
 .venv
+.aws
 env/
 venv/
 ENV/
