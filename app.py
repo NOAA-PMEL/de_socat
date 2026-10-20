@@ -84,7 +84,7 @@ from constants import (
     socat_mode, 
     redis_instance, 
     postgres_engine, 
-    regions, 
+    regions,
     region_names,
     zoom, 
     center, 
@@ -158,28 +158,7 @@ if thumbnail_num_plots > 3 and thumbnail_num_plots%3 > 0:
 image_height = thumbnail_num_rows*450
 
 
-socatQC = { 
-				'validExpoChars': "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-",
 
-				'fco2two': "Accuracy of calculated fCO2w (at SST) less than 2 uatm",
-				'fco2five': "Accuracy of calculated fCO2w (at SST) less than 5 uatm",
-				'fco2ten': "Accuracy of calculated fCO2w (at SST) less than 10 uatm",
-				'fco2bad': "Accuracy of calculated fCO2w (at SST) more than 10 uatm",
-
-				'soptrue': "Followed standard methods/SOP",
-				'sopfalse': "Did not follow standard methods/SOP",
-
-				'metacomplete': "Metadata complete",
-				'metalacking': "Metadata not complete",
-
-				'datagood': "Data quality acceptable",
-				'databad': "Significant amount of unacceptable-quality data",
-
-				'crossfound': "High-quality cross-over with ",
-				'crossnone': "No high-quality cross-overs found at the time of this QC",
-
-				'commentSpacer': ".  "
-			}
 
 thumbnail_vars = []
 for sub_list in thumbnail_pairs:
@@ -1744,7 +1723,7 @@ def prepare_download(clik, rows):
         Output('crossover-expocode', 'options', allow_duplicate=True),
         Output('crossover-expocode', 'value', allow_duplicate=True),
         Output('crossover-message', 'children', allow_duplicate=True),
-        Output('cruise_table_url', 'data'),
+        Output('cruise-table-url', 'data'),
         Output('download-link', 'style', allow_duplicate=True)
     ],
     [
@@ -1861,7 +1840,7 @@ def make_table_of_crusies(da_click, mt_in_expocodes, mt_in_start_date, mt_in_end
         Input('make-cruise-tracks', 'data')
     ],
     [
-        State('cruise_table_url', 'data')
+        State('cruise-table-url', 'data')
     ], prevent_initial_call = True
 )
 def make_cruise_tracks(trigger, hash_digest):

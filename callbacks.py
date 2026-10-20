@@ -1,16 +1,18 @@
 from dash import Input, Output, State, no_update
 import constants
-from constants import COLUMNS_FOR_WOCE_EDIT_TABLE_FIELD_NAME, postgres_engine
+from constants import COLUMNS_FOR_WOCE_EDIT_TABLE_FIELD_NAME, TABLE_OF_CRUISES_URL_FIELD_NAME, postgres_engine, save_socat_edits, QUEUE_URL, socatQC
 import json
 from io import StringIO
 import constants
 import pandas as pd
 from datetime import date, datetime, timezone
+
+from pandas.io.common import parse_url
 redis_instance = constants.redis_instance
 import db
+import requests
 
-
-
+import boto3
 
 def register_editor_callbacks(app):
 
@@ -39,9 +41,10 @@ def register_editor_callbacks(app):
         State('xover-comment', 'value'),
         State('qc-additional-comment', 'value'),
         State('plot-expocode', 'value'),
+        State('cruise-table-url', 'data'),
         prevent_initial_call=True
     ) 
-    def show_and_save_comments(click, qc_region_value, flag_value, fco2, sop, meta, data, xover, additional_comment, expocode):
+    def show_and_save_comments(click, qc_region_value, flag_value, fco2, sop, meta, data, xover, additional_comment, expocode, hash_digest):
         # DEBUG print('qc flag saved')
         full_comment = ''
         if fco2 is not None and fco2 != 'fco2no':
@@ -69,7 +72,10 @@ def register_editor_callbacks(app):
         if len(additional_comment) > 0:
             full_comment = full_comment + ' ' + additional_comment
         print ('final comment ', full_comment)
-        df_json_string = redis_instance.hget('cache', 'table-of-cruises').decode('utf-8')
+        if not hash_digest:
+            return no_update
+
+        df_json_string =  redis_instance.hget(hash_digest, TABLE_OF_CRUISES_URL_FIELD_NAME).decode('utf-8')
         df = pd.read_json(StringIO(json.loads(df_json_string)))
         row = df.loc[df['expocode']==expocode]
         socat_version = str(row['socat_version'])
@@ -77,6 +83,23 @@ def register_editor_callbacks(app):
         # Actually save the stuff instead of returning a query string
         frame_input = {'qc_flag': flag_value, 'qc_time': datetime.now(timezone.utc).isoformat(), 'expocode': expocode, 'socat_version': socat_version, 'region_id': qc_region_value, 'reviewer_id': 'FAKE REVIEWER', 'qc_comment': full_comment}
         df = pd.DataFrame(frame_input)
+        qc_json = df.to_json()
+        message = {
+            "type": "qc",
+            "payload": qc_json
+        }
+        sqs = boto3.client('sqs', region_name='us-east-1')
+        try:
+            response = sqs.send_message(
+                QueueUrl=QUEUE_URL,
+                MessageBody=json.dumps(message)
+            )
+            print(f"Success! Message ID: {response['MessageId']}")
+        except Exception as e:
+            print(f"Error: {e}")
+        # Initialize the SQS client
+
+        print(qc_json)
         df.to_sql(constants.qc_entries_table, postgres_engine, if_exists='append', index=False)
         return [full_comment, {'visibility':'visible'}, False]
 
@@ -124,9 +147,10 @@ def register_editor_callbacks(app):
         [
             State('selected-points', 'rowData'),
             State('comment','value'),
+            State('woce-flag-to-set', 'value')
         ], prevent_initial_call=True
     )
-    def save_flags(click, edited_points, in_comment):
+    def save_flags(click, edited_points, in_comment, in_flag_to_set):
         # The table has been updated in the UI so some rows are edited and some are not,
         # we can sort it out by reading the original data and the data passed in and saving the difference.
         reminder = 'You must supply a comment.'
@@ -149,8 +173,66 @@ def register_editor_callbacks(app):
         edits.loc[:, 'comment'] = in_comment
         save_edits = edits.iloc[start:]
         save_edits.to_sql(constants.edits_table, postgres_engine, if_exists='append', index=False)
-        # save_edits.to_sql(edits_table, db.mysql_engine, if_exists='append', index=False)
-        return '', {'visibility':'visible'}, f'The WOCE flag changes have been saved.  {save_edits.shape[0]} rows changed.', False
+
+        # Create the payload to send to the SaveSocatEdits server which will write the chaneges to the netCDF files
+        # {
+        #     "expocode": "MLYD20231002 ",
+        #     "reviewer_email": "andrew.watson@exetor.ac.uk",
+        #     "woce_flag_name": "WOCE_CO2_water ",
+        #     "woce_flag_value": 9,
+        #     "data_varaible_name": "fCO2_recommended",
+        #     "comment": "Now is the time for all good women to come to the aid of their party.",
+        #     "locations": [
+        #         {"longitude": 135.2843, "latitude": 34.6279, "fCO2_recommended": 223.54503295443286, "time": "2023-10-26T21:28:30Z"},
+        #         {"longitude": 135.293, "latitude": 34.6377, "fCO2_recommended": 230.84176539986032, "time": "2023-10-26T21:32:09Z"},
+        #         {"longitude": 135.3002, "latitude": 34.6462, "fCO2_recommended": 239.49466454933054, "time": "2023-10-26T21:35:47Z"},
+        #         {"longitude": 135.302, "latitude": 34.6549, "fCO2_recommended": 224.11538153304403, "time": "2023-10-26T21:39:26Z"},
+        #         {"longitude": 135.3027, "latitude": 34.6637, "fCO2_recommended": 202.44289747182435, "time": "2023-10-26T21:43:05Z"},
+        #         {"longitude": 135.3035, "latitude": 34.6725, "fCO2_recommended": 203.0030814405213, "time": "2023-10-26T21:46:43Z"},
+        #         {"longitude": 135.2941, "latitude": 34.6857, "fCO2_recommended": 219.22061434335848, "time": "2023-10-26T21:57:39Z"},
+        #         {"longitude": 135.2932, "latitude": 34.6872, "fCO2_recommended": 218.298545804183, "time": "2023-10-26T22:01:18Z"},
+        #         {"longitude": 135.2902, "latitude": 34.6872, "fCO2_recommended": 213.46550609711934, "time": "2023-10-26T22:12:13Z"},
+        #         {"longitude": 135.2901, "latitude": 34.687, "fCO2_recommended": 203.8336058791019, "time": "2023-10-26T22:15:52Z"}
+        #     ]
+        # } 
+
+        print(save_edits)
+        # Loop on the unique values that need to be saved, because it's one flag value per API call.abs
+        locations = (
+            save_edits.groupby('WOCE_CO2_water')[['latitude', 'longitude', 'fCO2_recommended', 'time']]
+            .apply(lambda x: x.to_dict(orient='records'))
+            .to_dict()
+        )
+        success_flags = []
+        fail_flags = []
+        for flag in save_edits[in_flag_to_set].unique().tolist():
+            payload = {}
+            payload['expocode'] = str(save_edits['expocode'].iloc[0])
+            payload['reviewer_email'] = 'do_not_have_a_logged_in_user@noaa.gov'  #TODO when we get the ol' login.gov working this needs to be fixed
+            payload['woce_flag_name'] = in_flag_to_set
+            payload['woce_flag_value'] = flag
+            payload["data_varaible_name"] = "fCO2_recommended"
+            payload['comment'] = in_comment
+            payload['locations'] = locations[flag]
+            # Call the FastAPI endpoint
+            
+
+            if save_socat_edits:
+                response = requests.post(save_socat_edits, json=payload)
+
+                # Check the response
+                if response.status_code == 200:
+                    success_flags.append(flag)
+                else:
+                    fail_flags.append(flag)
+                    file_edit_message = f"Error {response.status_code}: {response.text}"
+
+        message = f'The WOCE flag changes have been saved.  {save_edits.shape[0]} rows changed.'
+        if success_flags:
+            message = message + f"Rows with flags {success_flags} saved to remote database."
+        if fail_flags:
+            message = message + f"Contact support. Some flags, {fail_flags}, not saved in remote database."
+        return '', {'visibility':'visible'}, message, False
 
 
     @app.callback(

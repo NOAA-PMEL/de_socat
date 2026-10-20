@@ -496,7 +496,7 @@ def get_layout(
             dcc.Store(id="map-info"),
             dcc.Store(id='map-selected-date'),
             dcc.Store(id="make-cruise-tracks"),
-            dcc.Store(id="cruise_table_url"),
+            dcc.Store(id="cruise-table-url"),
             dcc.Store(id='grid-data-key'),
             dcc.Store(id='crossover-endpoints'),
             dcc.Store(id='download-filename'),
