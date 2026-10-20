@@ -1090,15 +1090,33 @@ region_id
                                 hover_data={'latitude':True, 'longitude':True, 'count':True,'log':False},
                                 )
         
-        figure.update_coloraxes(colorbar={'title': 'count', 'orientation':'v', 'title_side':'right','lenmode':'fraction', 'len':.65, 'y':.5, 
-                                'tickvals': [0, math.log10(10), math.log10(100), math.log10(1000), math.log10(10000), math.log10(100000)],
-                                'ticktext': ['0', '10', '100', '1,000', '10,000', '100,000'], 
-                                'tickmode':'array'
-                                },
-                                )
-        figure.update_geos(fitbounds='locations', lonaxis_range=[-180,180], lataxis_range=[-90,90], showland=True, landcolor='lightgrey', showocean=True, oceancolor="#9bedff", showlakes=True, lakecolor="#9bedff", coastlinecolor='black', coastlinewidth=1, resolution=50)
-        figure.update_traces(marker=dict(size=7), selected_marker_color='green' )
-        figure.update_layout(title=title, uirevision='x9999')
+        figure.update_coloraxes(
+            colorbar={
+                'title': 'count', 
+                'orientation': 'v',          # Switch to horizontal orientation
+                # 'yanchor': 'bottom',
+                # 'y': 1.08,                  # Places it cleanly below the map grid bounds
+                # 'xanchor': 'center',
+                # 'x': 0.5,                    # Centers it directly under the equator axis
+                # 'lenmode': 'fraction', 
+                'len': 0.65,                  # Takes up half the map width underneath
+                'tickvals': [0, math.log10(10), math.log10(100), math.log10(1000), math.log10(10000), math.log10(100000)],
+                'ticktext': ['0', '10', '100', '1,000', '10,000', '100,000'], 
+                'tickmode': 'array'
+            },
+        )
+        figure.update_geos(
+                # fitbounds='locations', 
+                center=dict(lon=0, lat=0),
+                lonaxis_showgrid=True,           # Useful for ensuring alignment checks
+                lataxis_showgrid=True, 
+                showland=True, landcolor='lightgrey', 
+                showocean=True, oceancolor="#9bedff", showlakes=True, lakecolor="#9bedff", 
+                coastlinecolor='black', coastlinewidth=1, resolution=50,
+                projection=dict(type='equirectangular', scale=1, minscale=1.0, maxscale=8)
+            )
+        figure.update_traces(marker=dict(size=8), selected_marker_color='green' )
+        figure.update_layout(uirevision='x9999', autosize=True)
         if mask_trace is not None:
             logger.debug(f'__{fname}__ adding mask')
             figure.add_traces(list(mask_trace.select_traces()))
@@ -1133,7 +1151,7 @@ region_id
         )
 
 
-    return [figure, '', False]
+    return [figure, title, False]
 
 def get_map_ranges(df):
     lon_neg = df[df['longitude']<0].count()
@@ -2120,47 +2138,47 @@ def log(method, message, object):
         pp.pprint(object)
 
 
-# Experiment to see if you can zoom smoothly with this callback
-@app.callback(
-    Output('map-graph', 'figure', allow_duplicate=True),
-    Input('map-graph', 'relayoutData'),
-    State('map-graph', 'figure'),
-    prevent_initial_call=True
-)
-def limit_map_zoom(relayout_data, figure):
-    fname = inspect.currentframe().f_code.co_name
-    if relayout_data and 'geo.projection.scale' in relayout_data:
-        #you can set these however you like
-        min_zoom_scale = 0.5
-        max_zoom_scale = 10.0 
+# # Experiment to see if you can zoom smoothly with this callback
+# @app.callback(
+#     Output('map-graph', 'figure', allow_duplicate=True),
+#     Input('map-graph', 'relayoutData'),
+#     State('map-graph', 'figure'),
+#     prevent_initial_call=True
+# )
+# def limit_map_zoom(relayout_data, figure):
+#     fname = inspect.currentframe().f_code.co_name
+#     if relayout_data and 'geo.projection.scale' in relayout_data:
+#         #you can set these however you like
+#         min_zoom_scale = 0.5
+#         max_zoom_scale = 10.0 
 
-        current_zoom_scale = relayout_data['geo.projection.scale']
+#         current_zoom_scale = relayout_data['geo.projection.scale']
 
-        logger.debug( f'__{fname}__ limiting if {current_zoom_scale} is outside min {min_zoom_scale} and max {max_zoom_scale}')
+#         logger.debug( f'__{fname}__ limiting if {current_zoom_scale} is outside min {min_zoom_scale} and max {max_zoom_scale}')
 
-        current_lon = relayout_data.get('geo.center.lon')
-        current_lat = relayout_data.get('geo.center.lat')
+#         current_lon = relayout_data.get('geo.center.lon')
+#         current_lat = relayout_data.get('geo.center.lat')
 
 
-        fig_copy = go.Figure(figure)
+#         fig_copy = go.Figure(figure)
 
-        if current_zoom_scale < min_zoom_scale:
-            fig_copy.update_layout(
-                geo_projection_scale=min_zoom_scale,
-                geo_center_lon=current_lon if current_lon is not None else figure['layout']['geo'].get('center', {}).get('lon'),
-                geo_center_lat=current_lat if current_lat is not None else figure['layout']['geo'].get('center', {}).get('lat')
-            )
-            return fig_copy
+#         if current_zoom_scale < min_zoom_scale:
+#             fig_copy.update_layout(
+#                 geo_projection_scale=min_zoom_scale,
+#                 geo_center_lon=current_lon if current_lon is not None else figure['layout']['geo'].get('center', {}).get('lon'),
+#                 geo_center_lat=current_lat if current_lat is not None else figure['layout']['geo'].get('center', {}).get('lat')
+#             )
+#             return fig_copy
 
-        elif current_zoom_scale > max_zoom_scale:
-            fig_copy.update_layout(
-                geo_projection_scale=max_zoom_scale,
-                geo_center_lon=current_lon if current_lon is not None else figure['layout']['geo'].get('center', {}).get('lon'),
-                geo_center_lat=current_lat if current_lat is not None else figure['layout']['geo'].get('center', {}).get('lat')
-            )
-            return fig_copy
+#         elif current_zoom_scale > max_zoom_scale:
+#             fig_copy.update_layout(
+#                 geo_projection_scale=max_zoom_scale,
+#                 geo_center_lon=current_lon if current_lon is not None else figure['layout']['geo'].get('center', {}).get('lon'),
+#                 geo_center_lat=current_lat if current_lat is not None else figure['layout']['geo'].get('center', {}).get('lat')
+#             )
+#             return fig_copy
 
-    return no_update
+#     return no_update
 
 
 @app.callback(
